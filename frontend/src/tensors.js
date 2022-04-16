@@ -1,99 +1,62 @@
-function inferShape(mda) {
-    if (Array.isArray(mda)) {
-        return [mda.length, ...inferShape(mda[0])]
+import ndarray from 'ndarray'
+import pack from 'ndarray-pack'
+import unpack from 'ndarray-unpack'
+
+import ops, { exp } from 'ndarray-ops'
+import linspace from 'ndarray-linspace'
+
+// DEBUG: Made global to use in devtools
+window.ndarray = ndarray
+window.pack = pack
+window.unpack = unpack
+window.ops = ops
+window.linspace = linspace
+
+function inferShape(arr) {
+    const shape = []
+    let c = arr
+    let size = 1
+
+    while (Array.isArray(c)) {
+        shape.push(c.length)
+        size *= c.length
+        c = c[0]
     }
 
-    return []
-}
-
-function defaultStrides(shape) {
-    // Example: a000 a001 a002 a003 a010 a011 a012 a013 a020 a021 a022 a023 a100 a101 a102 a103 a110 a111 a112 a113 a120 a121 a122 a123.
-
-    return shape // [2, 3, 4] ~> [12, 4, 1]
-        .slice(1) // [3, 4]
-        .reverse() // [4, 3]
-        .reduce((acc, dim) => [dim * acc[0], ...acc], [1])
-}
-
-function dot(a, b) {
-    const minLen = a.length <= b.length ? a.length : b.length
-    let r = 0
-
-    for (let i = 0; i < minLen; i++) {
-        r += a[i] * b[i]
-    }
-
-    return r
-}
-
-function atIndex(index, strides, offset = 0) {
-    return offset + dot(index, strides)
-}
-
-function flatten(arrays) {
-    if (Array.isArray(arrays)) return arrays.flatMap(el => flatten(el))
-
-    return arrays
+    return { size, shape }
 }
 
 export const Tensors = {
-    fromArrays(data) {
-        const shape = inferShape(data)
-
-        return {
-            shape,
-            strides: defaultStrides(shape),
-            offset: 0,
-            data: flatten(data),
-        }
+    ndarray,
+    fromArrays(arr) {
+        // creates an ndarray backed by a classic array instead of a Float64Array
+        const { size, shape } = inferShape(arr)
+        return pack(arr, ndarray(Array.from({ length: size }), shape))
     },
-    reshape(newShape, { data }) {
-        return {
-            shape: newShape,
-            strides: defaultStrides(newShape),
-            offset: 0,
-            data,
-        }
+    slice(offset, shape, tensor) {
+        return tensor.lo(...offset).hi(shape)
     },
-    at(index, { strides, offset, data }) {
-        return data[atIndex(index, strides, offset)]
+    plane(fn, tensor) {
+        return tensor.pick(...fn(...Array.from({ length: tensor.shape }, () => null)))
     },
-    slice(index, sliceShape, { shape, strides, offset, data }) {
-        shape.forEach((size, i) => {
-            if (index[i] + sliceShape[i] > size) throw new Error(`slice out of bounds`)
-        })
-
-        if (offset > 0) throw new Error('cannot slice an already sliced tensor')
-
-        return {
-            shape: sliceShape,
-            strides,
-            offset: atIndex(index, strides),
-            data,
-        }
+    // so you can write transpose((i, j) => [j, i], tensor)
+    transpose(fn, tensor) {
+        return tensor.transpose(...fn(...Arrays.indices(tensor.shape)))
     },
-    forEachIndex({ shape }, fn, index = []) {
-        if (shape.length === 1) {
-            for (let i = 0; i < shape[0]; i++) {
-                fn(...index, i)
-            }
-        } else {
-            for (let i = 0; i < shape[0]; i++) {
-                Tensors.forEachIndex({ shape: shape.slice(1) }, fn, [...index, i])
-            }
-        }
-    },
-    toArrays(tensor) {
-        const arr = []
-        if (tensor.shape.length === 1) {
-            for (let i = 0; i < shape[0]; i++) {
-                arr.push(fn(...index, i))
-            }
-        } else {
-            for (let i = 0; i < shape[0]; i++) {
-                arr.push(Tensors.toArrays({ shape: tensor.shape.slice(1) }, fn, [...index, i]))
-            }
-        }
-        return arr
+    toArrays(nd) {
+        return unpack(nd)
     },
 }
+
+window.Tensors = Tensors
+
+export const Arrays = {
+    range(low, high, step = 1) {
+        return Array.from({ length: Math.round((high - low) / step) + 1 }, (_, i) => i * step + low)
+    },
+    indices(arr) {
+        return Array.prototype.map.call(Array.from(arr), (_, i) => i)
+    },
+}
+
+window.Arrays = Arrays

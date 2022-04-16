@@ -3,7 +3,9 @@ import { Block } from './components/Block.jsx'
 
 import { NavBar } from './components/NavBar.jsx'
 import { SideBar } from './components/SideBar.jsx'
+
 import { currentProject, EXAMPLE_STATE_1 } from './model.js'
+import './tensors.js'
 
 export const App = () => {
     const [state, setState] = useState(EXAMPLE_STATE_1)

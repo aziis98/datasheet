@@ -1,3 +1,5 @@
+import ndarray from 'ndarray'
+import { Arrays, Tensors } from './tensors.js'
 import { dedent } from './util.js'
 
 export const EXAMPLE_STATE_1 = {
@@ -20,7 +22,18 @@ export const EXAMPLE_STATE_1 = {
                 {
                     type: 'tensor',
                     value: {
-                        data: Array.from({ length: 12 }).map((_, i) => i + 1),
+                        categories: ['Years', 'Months', 'Places'],
+                        headers: {
+                            Years: Arrays.range(2018, 2022),
+                            Months: 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' '),
+                            Places: 'House 1,House 2,House 3'.split(','),
+                        },
+                        view: {
+                            slices: ['Places'],
+                            rows: ['Years'],
+                            columns: ['Months'],
+                        },
+                        tensor: ndarray(Arrays.range(1, 180), [5, 12, 3]),
                     },
                 },
             ],

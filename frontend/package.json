@@ -8,9 +8,13 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "cwise": "^1.0.10",
         "ndarray": "^1.0.19",
+        "ndarray-linspace": "^2.0.3",
         "ndarray-ops": "^1.2.2",
+        "ndarray-pack": "^1.2.1",
         "ndarray-sort": "^1.0.1",
+        "ndarray-unpack": "^1.0.0",
         "preact": "^10.5.15"
     },
     "devDependencies": {
