@@ -4,12 +4,16 @@ import unpack from 'ndarray-unpack'
 
 import ops, { exp } from 'ndarray-ops'
 import linspace from 'ndarray-linspace'
+import zeros from 'zeros'
+import fill from 'ndarray-fill'
 
 // DEBUG: Made global to use in devtools
 window.ndarray = ndarray
 window.pack = pack
 window.unpack = unpack
 window.ops = ops
+window.zeros = zeros
+window.fill = fill
 window.linspace = linspace
 
 function inferShape(arr) {

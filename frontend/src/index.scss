@@ -108,13 +108,9 @@ nav {
 .sidebar {
     display: flex;
 
-    width: 25%;
     height: 100%;
 
-    min-width: 17rem;
-
     background: #fff;
-    border-right: 1px solid #ddd;
 
     --modes-size: 3.5rem;
 
@@ -158,6 +154,11 @@ nav {
 
     .view {
         padding: 0.5rem;
+
+        width: 20vw;
+        min-width: 14rem;
+
+        border-right: 1px solid #ddd;
 
         .outline {
             --ggs: 0.7;
