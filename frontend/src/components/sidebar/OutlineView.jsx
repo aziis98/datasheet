@@ -1,7 +1,5 @@
 // Outline shows an outline of the current project, this shows all the various "tensors" present in the current view with what axis are currently shown
 export const OutlineView = ({ project }) => {
-    console.log(project)
-
     return (
         <div class="outline">
             <div class="node">

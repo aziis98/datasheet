@@ -22,26 +22,43 @@ export const EXAMPLE_STATE_1 = {
                 {
                     type: 'tensor',
                     value: {
-                        categories: ['Years', 'Months', 'Places'],
+                        categories: ['Years', 'Months', 'Zones'],
                         headers: {
-                            Years: Arrays.range(2018, 2022),
-                            Months: 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' '),
-                            Places: 'House 1,House 2,House 3'.split(','),
+                            ['Years']: Arrays.range(2018, 2022).map(n => '' + n),
+                            ['Months']: 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(
+                                ' '
+                            ),
+                            ['Zones']: 'Zone 1,Zone 2,Zone 3'.split(','),
                         },
                         view: {
-                            slices: ['Places'],
-                            rows: ['Years'],
+                            slices: ['Years'],
+                            rows: ['Zones'],
                             columns: ['Months'],
                         },
                         tensor: ndarray(Arrays.range(1, 180), [5, 12, 3]),
+                    },
+                },
+                {
+                    type: 'tensor',
+                    value: {
+                        categories: ['X', 'Y', 'Z'],
+                        headers: {
+                            ['X']: Arrays.range(1, 2),
+                            ['Y']: Arrays.range(1, 3),
+                            ['Z']: Arrays.range(1, 5),
+                        },
+                        view: {
+                            slices: ['X'],
+                            rows: ['Y'],
+                            columns: ['Z'],
+                        },
+                        tensor: ndarray(Arrays.range(1, 30), [2, 3, 5]),
                     },
                 },
             ],
         },
     },
 }
-
-console.log(EXAMPLE_STATE_1.projects['80527d0a-bcc3-11ec-bc2c-7f4cfddd685e'].blocks[0].value)
 
 export function currentProject({ currentProject, projects }) {
     return projects[currentProject]

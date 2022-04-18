@@ -6,6 +6,14 @@ const blockComponentMap = {
     tensor: TensorBlock,
 }
 
-export const Block = ({ type, value }) => (
-    <div class={['block', type].join(' ')}>{blockComponentMap[type]({ ...value })}</div>
+export const Block = ({ type, value, setBlock }) => (
+    <div class={['block', type].join(' ')}>
+        {blockComponentMap[type]({
+            ...value,
+            setBlockValue: newValue => {
+                console.log(newValue)
+                setBlock({ type, value: newValue })
+            },
+        })}
+    </div>
 )
