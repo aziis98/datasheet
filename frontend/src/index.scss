@@ -279,6 +279,17 @@ nav {
         // Blocks
         //
 
+        .markdown {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+
+            font-size: 16px;
+            max-width: 80ch;
+
+            line-height: 1.5;
+        }
+
         .tensor {
             width: 100%;
             height: 100%;
@@ -483,6 +494,11 @@ p {
     margin: 0;
 }
 
+@for $i from 1 through 6 {
+    h#{$i} {
+        margin: 0;
+    }
+}
 // Components
 
 .button {
@@ -491,6 +507,17 @@ p {
     border-radius: 0.25rem;
 
     padding: 0.25rem 0.5rem;
+}
+
+textarea {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    font-size: 16px;
+
+    padding: 0.5rem;
+
+    border: 1px solid #aaa;
+    border-radius: 3px;
 }
 
 .todo-box {

@@ -15,7 +15,9 @@ export const EXAMPLE_STATE_1 = {
                         source: dedent(`
                             # Example
 
-                            Lorem ipsum
+                            Lorem ipsum dolor _sit_ amet *consectetur* adipisicing elit. Facilis aliquid excepturi maxime ~consequuntur~ cum dolore a saepe, perspiciatis accusamus voluptas suscipit amet impedit, laudantium distinctio, quibusdam repellendus?
+                            
+                            Eaque, vitae! Vero natus cum maxime dolorem ipsam, deserunt ipsum reprehenderit odit! Possimus ipsa itaque numquam illo rerum totam officiis vel aut facilis.
                         `),
                     },
                 },
@@ -39,6 +41,16 @@ export const EXAMPLE_STATE_1 = {
                     },
                 },
                 {
+                    type: 'markdown',
+                    value: {
+                        source: dedent(`
+                            Odit repudiandae aliquam ex quas at nobis earum facilis corporis fuga numquam dignissimos, laudantium placeat asperiores, atque vitae aperiam non maiores perferendis rerum in. 
+                            
+                            Similique odio officiis eos porro ducimus aut libero nulla, ullam tenetur nam? Est neque error dolorum fuga, necessitatibus, temporibus similique laboriosam veritatis natus labore nisi obcaecati.
+                        `),
+                    },
+                },
+                {
                     type: 'tensor',
                     value: {
                         categories: ['X', 'Y', 'Z'],
@@ -53,6 +65,14 @@ export const EXAMPLE_STATE_1 = {
                             columns: ['Z'],
                         },
                         tensor: ndarray(Arrays.range(1, 30), [2, 3, 5]),
+                    },
+                },
+                {
+                    type: 'markdown',
+                    value: {
+                        source: dedent(`
+                            Similique odio officiis eos porro ducimus aut libero nulla, ullam tenetur nam? Est neque error dolorum fuga, necessitatibus, temporibus similique laboriosam veritatis natus labore nisi obcaecati.
+                        `),
                     },
                 },
             ],
