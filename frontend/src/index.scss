@@ -2,8 +2,6 @@
     font-family: 'Poppins', sans-serif;
     font-weight: 400;
     font-size: 15px;
-
-    --nav-size: 4.5rem;
 }
 
 *,
@@ -38,11 +36,11 @@ body {
 
 nav {
     display: grid;
-    grid-template-columns: var(--nav-size) 1fr auto;
+    grid-template-columns: 4rem 1fr auto;
     grid-template-rows: 1fr auto;
 
     width: 100%;
-    height: var(--nav-size);
+    height: 4.5rem;
 
     grid-template-areas:
         'logo title user'
@@ -55,8 +53,8 @@ nav {
         grid-area: logo;
         place-self: center;
 
-        width: var(--nav-size);
-        height: var(--nav-size);
+        width: 4rem;
+        height: 4rem;
 
         padding: 1rem;
 
@@ -80,7 +78,7 @@ nav {
         display: flex;
 
         .menu-item {
-            padding: 0.25rem 0.5rem;
+            padding: 0.125rem 0.5rem;
 
             cursor: pointer;
 
@@ -94,7 +92,7 @@ nav {
         grid-area: user;
         align-self: center;
 
-        @extend .button;
+        @extend .button-flat;
     }
 }
 
@@ -102,7 +100,7 @@ nav {
     display: flex;
 
     width: 100%;
-    height: calc(100vh - var(--nav-size));
+    height: calc(100vh - 4.5rem);
 }
 
 .sidebar {
@@ -204,7 +202,7 @@ nav {
                     }
 
                     &:hover {
-                        background: #f0f0f0;
+                        background: #e8e8e8;
                     }
                 }
 
@@ -280,6 +278,8 @@ nav {
         //
 
         .markdown {
+            user-select: text;
+
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
@@ -379,6 +379,31 @@ nav {
                             border-left: none;
                             border-right: none;
                             border-top: none;
+                        }
+
+                        .header {
+                            padding: 0;
+
+                            select {
+                                outline: none;
+
+                                font-family: 'Poppins', sans-serif;
+                                font-weight: 500;
+                                font-size: 15px;
+
+                                color: #484848;
+
+                                padding: 0.125rem 0.25rem;
+                                min-width: 5rem;
+
+                                background: #f0f0f0;
+
+                                text-align: center;
+
+                                &:hover {
+                                    background: #ddd;
+                                }
+                            }
                         }
                     }
 
@@ -501,12 +526,25 @@ p {
 }
 // Components
 
-.button {
+.button,
+.button-flat {
     background: #e8e8e8;
-    // border: 1px solid #ddd;
     border-radius: 0.25rem;
-
     padding: 0.25rem 0.5rem;
+
+    cursor: pointer;
+
+    &:hover {
+        background: #d8d8d8;
+    }
+}
+
+.button {
+    border: 1px solid #d0d0d0;
+
+    &:hover {
+        border: 1px solid #c8c8c8;
+    }
 }
 
 textarea {
@@ -518,6 +556,18 @@ textarea {
 
     border: 1px solid #aaa;
     border-radius: 3px;
+}
+
+select {
+    background: none;
+    border: none;
+    // appearance: none;
+
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+
+    // outline: none;
 }
 
 .todo-box {

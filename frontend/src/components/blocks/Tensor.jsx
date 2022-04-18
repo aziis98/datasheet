@@ -1,6 +1,6 @@
 import ndarray from 'ndarray'
 import unpack from 'ndarray-unpack'
-import { useRef, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import zeros from 'zeros'
 import { useDragAndDrop } from '../../hooks.js'
 import { Arrays, Tensors } from '../../tensors.js'
@@ -81,6 +81,10 @@ function invertCategoryMap(map) {
     return res
 }
 
+function clamp(min, value, max) {
+    return value < min ? min : value > max ? max : value
+}
+
 const SliceAxisComponent = ({ slices, headers, sliceIndices, setSliceIndices, dnd }) => {
     const { dragging, dragBeginProps, dragEndProps } = dnd
 
@@ -92,6 +96,21 @@ const SliceAxisComponent = ({ slices, headers, sliceIndices, setSliceIndices, dn
         setSliceIndices(newIndices)
     }
 
+    const handleScrollWheel = (slice, i) => e => {
+        e.preventDefault()
+
+        if (Math.abs(e.deltaY) > 10) {
+            const newIndices = [...sliceIndices]
+            if (e.deltaY > 0) {
+                newIndices[i] = clamp(0, newIndices[i] + 1, headers[slice].length - 1)
+                setSliceIndices(newIndices)
+            } else {
+                newIndices[i] = clamp(0, newIndices[i] - 1, headers[slice].length - 1)
+                setSliceIndices(newIndices)
+            }
+        }
+    }
+
     return (
         <div class="slice-axis">
             {slices.map((slice, i) => (
@@ -100,7 +119,11 @@ const SliceAxisComponent = ({ slices, headers, sliceIndices, setSliceIndices, dn
                         {slice}
                     </div>
                     <div class="header">
-                        <select value={sliceIndices[i]} onChange={onSliceIndexChange(i)}>
+                        <select
+                            value={sliceIndices[i]}
+                            onWheel={handleScrollWheel(slice, i)}
+                            onChange={onSliceIndexChange(i)}
+                        >
                             {headers[slice].map((header, ii) => (
                                 <option value={ii}>{header}</option>
                             ))}
@@ -198,8 +221,6 @@ export const TensorBlock = ({ categories, headers, view, tensor, setBlockValue }
     const [sliceIndices, setSliceIndices] = useState(slices.map(() => 0))
 
     const dnd = useDragAndDrop((movedAxis, newPlace) => {
-        console.log(movedAxis, newPlace)
-
         const newView = {
             slices: slices.filter(axis => axis !== movedAxis),
             rows: rows.filter(axis => axis !== movedAxis),
