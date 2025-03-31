@@ -1,0 +1,287 @@
+@layer base, typography, components, utilities;
+
+@layer base {
+    *,
+    *::before,
+    *::after {
+        font: inherit;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    html,
+    body {
+        min-height: 100%;
+
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+
+        color: #333;
+        background-color: #f0f0f0;
+
+        user-select: none;
+    }
+
+    img {
+        display: block;
+    }
+}
+
+@layer typography {
+    code {
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    ::selection {
+        background: #5a83ff;
+        color: #fff;
+    }
+}
+
+@layer components {
+    nav {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        position: relative;
+
+        font-size: 18px;
+        font-weight: 500;
+
+        background: #fff;
+        border-bottom: 1px solid #ccc;
+        box-shadow: 0 0 0.5rem #0001;
+
+        > * {
+            padding: 0.5rem;
+        }
+
+        > .left {
+            grid-column: 1 / 2;
+        }
+
+        > .right {
+            grid-column: -2 / -1;
+        }
+
+        > .center {
+            position: absolute;
+
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    }
+
+    main {
+        padding: 2rem 4rem;
+        display: grid;
+    }
+
+    .notebook {
+        display: grid;
+        grid-template-columns: auto;
+        grid-auto-flow: row;
+        gap: 2rem;
+
+        /* border: 1px dashed magenta; */
+
+        align-content: start;
+        justify-content: center;
+    }
+
+    .cell {
+        display: grid;
+        grid-template-rows: auto auto;
+
+        place-content: center;
+
+        > .input {
+            display: grid;
+
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 0.35rem;
+            box-shadow: 0 0 0.5rem #0001;
+
+            position: relative;
+
+            > .metadata-left {
+                position: absolute;
+
+                top: 50%;
+                right: 100%;
+                transform: translateY(-50%);
+
+                padding-right: 1rem;
+                text-align: right;
+
+                font-size: 13px;
+                font-weight: 500;
+                color: #666;
+            }
+
+            > .content {
+                overflow: hidden;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 15px;
+                color: #333;
+
+                min-width: 80ch;
+
+                textarea,
+                input[type='Text'] {
+                    display: grid;
+                    place-content: center;
+                    place-items: center;
+
+                    padding: 0.25rem 0.5rem;
+
+                    width: 100%;
+                    height: 100%;
+
+                    min-width: 80ch;
+
+                    outline: none;
+                    border: none;
+                    background: none;
+
+                    border-radius: 0.35rem;
+
+                    resize: none;
+
+                    &:focus {
+                        resize: both;
+                        box-shadow: inset 0 0 0.25rem #5a83ff;
+                    }
+                }
+            }
+        }
+
+        > .output {
+            margin-top: -0.25rem;
+
+            padding: 0.5rem;
+            padding-top: 0.75rem;
+
+            display: grid;
+            place-content: center;
+
+            background: #ededed;
+            border: 1px solid #ddd;
+            border-bottom-left-radius: 0.35rem;
+            border-bottom-right-radius: 0.35rem;
+
+            box-shadow: inset 0 0 0.5rem #0001;
+        }
+    }
+
+    .data {
+        display: grid;
+        place-content: center;
+        place-items: center;
+
+        min-width: 1.25rem;
+        min-height: 1.25rem;
+
+        &.array {
+            grid-template-columns: auto auto;
+
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 0.35rem;
+            box-shadow: 0 0 0.5rem #0001;
+
+            overflow: hidden;
+
+            > .item {
+                grid-column: span 2;
+                grid-template-columns: subgrid;
+                gap: 0.25rem;
+                padding: 0.25rem;
+
+                > .index {
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: #666;
+                }
+
+                &:hover {
+                    background: #0000000d;
+                }
+            }
+
+            &:not(.compact) {
+                > .item {
+                    &:not(:last-child) {
+                        border-bottom: 1px solid #ccc;
+                    }
+                }
+            }
+
+            &.compact {
+                grid-auto-flow: column;
+
+                > .item {
+                    grid-column: span 1;
+                    grid-template-columns: auto;
+
+                    > .index {
+                        display: none;
+                    }
+
+                    &:not(:last-child) {
+                        border-right: 1px solid #ccc;
+                    }
+                }
+            }
+        }
+
+        &.object {
+            grid-template-columns: auto auto;
+
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 0.35rem;
+            box-shadow: 0 0 0.5rem #0001;
+
+            > .entry {
+                grid-column: span 2;
+                grid-template-columns: subgrid;
+
+                &:not(:first-child) {
+                    border-top: 1px solid #ccc;
+                }
+
+                > .key {
+                    padding: 0 0.25rem;
+                    border-right: 1px solid #ccc;
+
+                    font-size: 15px;
+                    font-weight: 500;
+                }
+
+                &:hover {
+                    background: #0000000d;
+                }
+            }
+        }
+
+        &.number {
+            padding: 0.125rem 0.25rem;
+
+            font-size: 14px;
+            color: #4169e1;
+            font-weight: 500;
+        }
+
+        &.string {
+            padding: 0.125rem 0.25rem;
+
+            font-size: 14px;
+            color: #ffa500;
+            font-weight: 500;
+        }
+    }
+}

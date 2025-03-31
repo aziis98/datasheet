@@ -1,0 +1,22 @@
+{
+    "name": "2025-03-31-data-notebook",
+    "module": "index.ts",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "devDependencies": {
+        "@preact/preset-vite": "^2.10.1",
+        "@types/bun": "latest",
+        "vite": "^6.2.4"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    },
+    "dependencies": {
+        "clsx": "^2.1.1",
+        "preact": "^10.26.4"
+    }
+}
