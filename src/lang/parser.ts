@@ -343,35 +343,35 @@ function parseObject(tokens: Token[], posRef: { pos: number }): Node {
 }
 
 // Example usage:
-const codeSamples = [
-    'true',
-    'false',
-    '[ 1 2 3 $var_1 ]',
-    '{ foo: "A string" }',
-    '(1)', // grouping
-    'add(1 2)', // function call
-    '1 | double', // piping operator
-    'sum(1 2) | double(3)', // chaining pipe and function call
-    'user.name', // property access
-    'getUser().address.street', // chained member access
-    '1 + 2 - 3', // binary operators left-associative
-    'a * b / c', // binary operators
-    'a + b * c', // no precedence: parsed left-to-right
-    'a + (b * c)', // no precedence: parsed left-to-right
-    'x ? y : z', // example operator chain (if these characters form an operator)
-]
+// const codeSamples = [
+//     'true',
+//     'false',
+//     '[ 1 2 3 $var_1 ]',
+//     '{ foo: "A string" }',
+//     '(1)', // grouping
+//     'add(1 2)', // function call
+//     '1 | double', // piping operator
+//     'sum(1 2) | double(3)', // chaining pipe and function call
+//     'user.name', // property access
+//     'getUser().address.street', // chained member access
+//     '1 + 2 - 3', // binary operators left-associative
+//     'a * b / c', // binary operators
+//     'a + b * c', // no precedence: parsed left-to-right
+//     'a + (b * c)', // no precedence: parsed left-to-right
+//     'x ? y : z', // example operator chain (if these characters form an operator)
+// ]
 
-for (const code of codeSamples) {
-    try {
-        console.log(`\nParsing code: "${code}"`)
-        const tokens = lex(code)
-        console.log('Tokens:', tokens)
-        const ast = parse(tokens)
-        console.log('AST:', JSON.stringify(ast, null, 2))
-    } catch (e) {
-        console.error(e)
-    }
-}
+// for (const code of codeSamples) {
+//     try {
+//         console.log(`\nParsing code: "${code}"`)
+//         const tokens = lex(code)
+//         console.log('Tokens:', tokens)
+//         const ast = parse(tokens)
+//         console.log('AST:', JSON.stringify(ast, null, 2))
+//     } catch (e) {
+//         console.error(e)
+//     }
+// }
 
 export function parseSource(code: string): Node | { error: string } {
     try {

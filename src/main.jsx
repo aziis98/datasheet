@@ -1,8 +1,10 @@
 import clsx from 'clsx'
 import { render } from 'preact'
 import { useMemo, useState } from 'preact/hooks'
-import { parseSource } from './lang/index.ts'
+import { parseSource } from './lang/parser.js'
 import { matchTraverseObject } from './utils.js'
+import { evaluateNode, evaluateNodeSafe } from './lang/eval.js'
+import { applyTextEditorBehavior } from './editor.js'
 
 const DataValueRenderer = ({ value }) => {
     if (value === null || value === undefined) {
@@ -92,6 +94,12 @@ const Cell = ({ input, setInput, output, metadata }) => {
                 <div class="content">
                     <textarea
                         value={input}
+                        onKeyDown={e => {
+                            const newText = applyTextEditorBehavior(e)
+                            if (newText !== null) {
+                                setInput(newText)
+                            }
+                        }}
                         onInput={e => setInput(e.target.value)}
                         placeholder="Type something..."
                         rows={Math.max(1, input.split('\n').length)}
@@ -131,17 +139,9 @@ const Notebook = () => {
     //     },
     // ]
 
-    const [exampleInput, setExampleInput] = useState('1 + 1')
-
-    const ast = useMemo(
-        () =>
-            matchTraverseObject(
-                parseSource(exampleInput),
-                (_node, path) => path.at(-1) === 'token',
-                _node => matchTraverseObject.remove
-            ),
-        [exampleInput]
-    )
+    const [exampleInput, setExampleInput] = useState('[1 2 3]')
+    const inputAst = useMemo(() => parseSource(exampleInput), [exampleInput])
+    const evaluatedOutput = useMemo(() => evaluateNodeSafe(inputAst), [inputAst])
 
     return (
         <div class="notebook">
@@ -154,7 +154,7 @@ const Notebook = () => {
                     metadata={<code>${index + 1}</code>}
                 />
             ))} */}
-            <Cell input={exampleInput} setInput={setExampleInput} output={ast} />
+            <Cell input={exampleInput} setInput={setExampleInput} output={evaluatedOutput?.result ?? evaluatedOutput} />
         </div>
     )
 }
@@ -163,8 +163,10 @@ const App = () => {
     return (
         <>
             <nav>
-                <div class="left">DataSheet</div>
-                <div class="center">???</div>
+                <div class="left">
+                    <div class="logo">DataSheet</div>
+                </div>
+                {/* <div class="center">???</div> */}
                 <div class="right">Login</div>
             </nav>
             <main>

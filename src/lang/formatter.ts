@@ -1,4 +1,4 @@
-import type { Node } from '.'
+import type { Node } from './parser'
 
 function formatAST(node: Node, indent = '', inlineThreshold = 1): { result: string; depth: number } {
     const indentStep = '  '
