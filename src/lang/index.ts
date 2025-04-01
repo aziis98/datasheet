@@ -1,14 +1,14 @@
 // Token types and interface
 type TokenType = 'Boolean' | 'Number' | 'String' | 'Identifier' | 'Operator' | 'Punctuation'
 
-interface Token {
+type Token = {
     type: TokenType
     value: string
     offset: number
     length: number
 }
 
-// Updated regex based lexer with operator tokens matching 1-3 characters from the set
+// Updated regex based lexer with operator tokens (1-3 characters from set)
 const tokenSpecs: [TokenType, RegExp][] = [
     ['Boolean', /^(true|false)\b/],
     ['Number', /^(\d+(\.\d+)?)/],
@@ -47,18 +47,106 @@ function lex(input: string): Token[] {
     return tokens
 }
 
-// AST node types with token metadata
-type Node =
-    | { type: 'BooleanLiteral'; value: boolean; token: Token }
-    | { type: 'NumberLiteral'; value: number; token: Token }
-    | { type: 'StringLiteral'; value: string; token: Token }
-    | { type: 'Identifier'; name: string; token: Token }
-    | { type: 'Array'; elements: Node[]; token: Token }
-    | { type: 'Object'; members: { key: string; value: Node }[]; token: Token }
-    | { type: 'CallExpression'; callee: Node; arguments: Node[]; token: Token }
-    | { type: 'PipeExpression'; left: Node; right: Node; token: Token }
-    | { type: 'MemberExpression'; object: Node; property: Node; token: Token }
-    | { type: 'BinaryExpression'; left: Node; operator: string; right: Node; token: Token }
+// AST node types
+export type Node =
+    | BooleanLiteralNode
+    | NumberLiteralNode
+    | StringLiteralNode
+    | IdentifierNode
+    | GroupingExpressionNode
+    | ArrayNode
+    | ObjectNode
+    | CallExpressionNode
+    | PipeExpressionNode
+    | MemberExpressionNode
+    | BinaryExpressionNode
+
+type BooleanLiteralNode = {
+    type: 'BooleanLiteral'
+    value: boolean
+    token?: Token
+}
+
+type NumberLiteralNode = {
+    type: 'NumberLiteral'
+    value: number
+    token?: Token
+}
+
+type StringLiteralNode = {
+    type: 'StringLiteral'
+    value: string
+    token?: Token
+}
+
+type IdentifierNode = {
+    type: 'Identifier'
+    name: string
+    token?: Token
+}
+
+type GroupingExpressionNode = {
+    type: 'GroupingExpression'
+    expression: Node
+    startToken?: Token
+    endToken?: Token
+}
+
+type ArrayNode = {
+    type: 'Array'
+    elements: Node[]
+    startToken?: Token
+    endToken?: Token
+}
+
+type ObjectNode = {
+    type: 'Object'
+    members: { key: string; value: Node }[]
+    startToken?: Token
+    endToken?: Token
+}
+
+type CallExpressionNode = {
+    type: 'CallExpression'
+    callee: Node
+    arguments: Node[]
+    startToken?: Token
+    endToken?: Token
+}
+
+type PipeExpressionNode = {
+    type: 'PipeExpression'
+    left: Node
+    right: Node
+    startToken?: Token
+    endToken?: Token
+}
+
+type MemberExpressionNode = {
+    type: 'MemberExpression'
+    object: Node
+    property: Node
+    startToken?: Token
+    endToken?: Token
+}
+
+type BinaryExpressionNode = {
+    type: 'BinaryExpression'
+    operator: string
+    left: Node
+    right: Node
+    startToken?: Token
+    endToken?: Token
+}
+
+// Helper functions to extract start/end token from an AST node
+function getStartToken(node: Node): Token {
+    return 'startToken' in node ? (node as any).startToken : (node as any).token
+}
+
+function getEndToken(node: Node): Token {
+    return 'endToken' in node ? (node as any).endToken : (node as any).token
+}
 
 // Utility functions for token management
 function peek(tokens: Token[], pos: number): Token | null {
@@ -90,21 +178,24 @@ function parse(tokens: Token[]): Node {
     return expr
 }
 
-// Parse expression handling binary and pipe operators
+// Parse expression: handle binary and pipe operators (all left-associative)
 function parseExpression(tokens: Token[], posRef: { pos: number }): Node {
-    // First, parse a binary expression (all operators left-associative, no precedence)
     let left = parseBinary(tokens, posRef)
-    // Then handle piping operator, which is left-associative too
     while (peek(tokens, posRef.pos)?.type === 'Punctuation' && peek(tokens, posRef.pos)?.value === '|') {
-        const pipeToken = pop(tokens, posRef) // consume '|'
+        const pipeToken = pop(tokens, posRef)
         const right = parseBinary(tokens, posRef)
-        // Use the left token metadata for the pipe expression
-        left = { type: 'PipeExpression', left, right, token: pipeToken }
+        left = {
+            type: 'PipeExpression',
+            left,
+            right,
+            startToken: getStartToken(left),
+            endToken: getEndToken(right),
+        }
     }
     return left
 }
 
-// Parse binary expressions with all operators of equal precedence
+// Parse binary expressions (all operators same precedence, left-associative)
 function parseBinary(tokens: Token[], posRef: { pos: number }): Node {
     let left = parseCallMember(tokens, posRef)
     while (peek(tokens, posRef.pos)?.type === 'Operator') {
@@ -112,10 +203,11 @@ function parseBinary(tokens: Token[], posRef: { pos: number }): Node {
         const right = parseCallMember(tokens, posRef)
         left = {
             type: 'BinaryExpression',
-            left,
             operator: opToken.value,
+            left,
             right,
-            token: opToken,
+            startToken: getStartToken(left),
+            endToken: getEndToken(right),
         }
     }
     return left
@@ -129,7 +221,7 @@ function parseCallMember(tokens: Token[], posRef: { pos: number }): Node {
         if (!next) break
         // Function call: (...)
         if (next.type === 'Punctuation' && next.value === '(') {
-            pop(tokens, posRef) // Consume '('
+            const openParen = pop(tokens, posRef)
             const args: Node[] = []
             while (
                 peek(tokens, posRef.pos) &&
@@ -137,16 +229,32 @@ function parseCallMember(tokens: Token[], posRef: { pos: number }): Node {
             ) {
                 args.push(parseExpression(tokens, posRef))
             }
-            expect(tokens, posRef, 'Punctuation', ')')
-            expr = { type: 'CallExpression', callee: expr, arguments: args, token: expr.token }
+            const closeParen = expect(tokens, posRef, 'Punctuation', ')')
+            expr = {
+                type: 'CallExpression',
+                callee: expr,
+                arguments: args,
+                startToken: getStartToken(expr),
+                endToken: closeParen,
+            }
             continue
         }
         // Property access: .Identifier
         if (next.type === 'Punctuation' && next.value === '.') {
-            pop(tokens, posRef) // Consume '.'
+            pop(tokens, posRef) // consume '.'
             const propertyToken = expect(tokens, posRef, 'Identifier')
-            const property: Node = { type: 'Identifier', name: propertyToken.value, token: propertyToken }
-            expr = { type: 'MemberExpression', object: expr, property, token: expr.token }
+            const property: IdentifierNode = {
+                type: 'Identifier',
+                name: propertyToken.value,
+                token: propertyToken,
+            }
+            expr = {
+                type: 'MemberExpression',
+                object: expr,
+                property,
+                startToken: getStartToken(expr),
+                endToken: propertyToken,
+            }
             continue
         }
         break
@@ -179,16 +287,21 @@ function parsePrimary(tokens: Token[], posRef: { pos: number }): Node {
         if (token.value === '[') return parseArray(tokens, posRef)
         if (token.value === '{') return parseObject(tokens, posRef)
         if (token.value === '(') {
-            pop(tokens, posRef) // consume '('
+            const openParen = pop(tokens, posRef)
             const expr = parseExpression(tokens, posRef)
-            expect(tokens, posRef, 'Punctuation', ')')
-            return expr
+            const closeParen = expect(tokens, posRef, 'Punctuation', ')')
+            return {
+                type: 'GroupingExpression',
+                expression: expr,
+                startToken: openParen,
+                endToken: closeParen,
+            }
         }
     }
     throw new Error(`Unexpected token ${token.type} (${token.value}) at offset ${token.offset}`)
 }
 
-// Parse arrays (elements are full expressions)
+// Parse arrays: [ elements ]
 function parseArray(tokens: Token[], posRef: { pos: number }): Node {
     const openBracket = expect(tokens, posRef, 'Punctuation', '[')
     const elements: Node[] = []
@@ -198,11 +311,16 @@ function parseArray(tokens: Token[], posRef: { pos: number }): Node {
         if (next.type === 'Punctuation' && next.value === ']') break
         elements.push(parseExpression(tokens, posRef))
     }
-    expect(tokens, posRef, 'Punctuation', ']')
-    return { type: 'Array', elements, token: openBracket }
+    const closeBracket = expect(tokens, posRef, 'Punctuation', ']')
+    return {
+        type: 'Array',
+        elements,
+        startToken: openBracket,
+        endToken: closeBracket,
+    }
 }
 
-// Parse objects (member values are full expressions)
+// Parse objects: { key: value, ... }
 function parseObject(tokens: Token[], posRef: { pos: number }): Node {
     const openBrace = expect(tokens, posRef, 'Punctuation', '{')
     const members: { key: string; value: Node }[] = []
@@ -215,8 +333,13 @@ function parseObject(tokens: Token[], posRef: { pos: number }): Node {
         const valueNode = parseExpression(tokens, posRef)
         members.push({ key: keyToken.value, value: valueNode })
     }
-    expect(tokens, posRef, 'Punctuation', '}')
-    return { type: 'Object', members, token: openBrace }
+    const closeBrace = expect(tokens, posRef, 'Punctuation', '}')
+    return {
+        type: 'Object',
+        members,
+        startToken: openBrace,
+        endToken: closeBrace,
+    }
 }
 
 // Example usage:
@@ -250,7 +373,11 @@ for (const code of codeSamples) {
     }
 }
 
-export function parseSource(code: string): Node {
-    const tokens = lex(code)
-    return parse(tokens)
+export function parseSource(code: string): Node | { error: string } {
+    try {
+        const tokens = lex(code)
+        return parse(tokens)
+    } catch (err) {
+        return { error: err!.toString() }
+    }
 }

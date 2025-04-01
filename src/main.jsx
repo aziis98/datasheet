@@ -1,5 +1,8 @@
 import clsx from 'clsx'
 import { render } from 'preact'
+import { useMemo, useState } from 'preact/hooks'
+import { parseSource } from './lang/index.ts'
+import { matchTraverseObject } from './utils.js'
 
 const DataValueRenderer = ({ value }) => {
     if (value === null || value === undefined) {
@@ -101,36 +104,48 @@ const Cell = ({ input, setInput, output, metadata }) => {
 }
 
 const Notebook = () => {
-    const cells = [
-        {
-            input: '[1 2 3]',
-            output: [1, 2, 3],
-        },
-        {
-            input: '[4 5 6]',
-            output: [4, 5, 6],
-        },
-        {
-            input: `
-                [
-                    { foo: 1, bar: 2 }
-                    { foo: 3, bar: 4 }
-                    { foo: 5, bar: 6 }
-                ]
-            `
-                .replace(/\s+/g, ' ')
-                .trim(),
-            output: [
-                { foo: 1, bar: 2 },
-                { foo: 3, bar: 4 },
-                { foo: 5, bar: 6 },
-            ],
-        },
-    ]
+    // const cells = [
+    //     {
+    //         input: '[1 2 3]',
+    //         output: [1, 2, 3],
+    //     },
+    //     {
+    //         input: '[4 5 6]',
+    //         output: [4, 5, 6],
+    //     },
+    //     {
+    //         input: `
+    //             [
+    //                 { foo: 1, bar: 2 }
+    //                 { foo: 3, bar: 4 }
+    //                 { foo: 5, bar: 6 }
+    //             ]
+    //         `
+    //             .replace(/\s+/g, ' ')
+    //             .trim(),
+    //         output: [
+    //             { foo: 1, bar: 2 },
+    //             { foo: 3, bar: 4 },
+    //             { foo: 5, bar: 6 },
+    //         ],
+    //     },
+    // ]
+
+    const [exampleInput, setExampleInput] = useState('1 + 1')
+
+    const ast = useMemo(
+        () =>
+            matchTraverseObject(
+                parseSource(exampleInput),
+                (_node, path) => path.at(-1) === 'token',
+                _node => matchTraverseObject.remove
+            ),
+        [exampleInput]
+    )
 
     return (
         <div class="notebook">
-            {cells.map((cell, index) => (
+            {/* {cells.map((cell, index) => (
                 <Cell
                     key={index}
                     input={cell.input}
@@ -138,7 +153,8 @@ const Notebook = () => {
                     output={cell.output}
                     metadata={<code>${index + 1}</code>}
                 />
-            ))}
+            ))} */}
+            <Cell input={exampleInput} setInput={setExampleInput} output={ast} />
         </div>
     )
 }

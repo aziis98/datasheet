@@ -178,8 +178,7 @@
 
     .data {
         display: grid;
-        place-content: center;
-        place-items: center;
+        align-content: center;
 
         min-width: 1.25rem;
         min-height: 1.25rem;
@@ -255,11 +254,20 @@
                 }
 
                 > .key {
+                    justify-items: end;
+
                     padding: 0 0.25rem;
                     border-right: 1px solid #ccc;
 
                     font-size: 15px;
                     font-weight: 500;
+                }
+
+                > .value {
+                    &:has(> .data.array),
+                    &:has(> .data.object) {
+                        padding: 0.25rem;
+                    }
                 }
 
                 &:hover {
@@ -280,7 +288,7 @@
             padding: 0.125rem 0.25rem;
 
             font-size: 14px;
-            color: #ffa500;
+            color: #cc8500;
             font-weight: 500;
         }
     }
