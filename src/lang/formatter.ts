@@ -111,29 +111,33 @@ function formatAST(node: Node, indent = '', inlineThreshold = 1): { result: stri
 const exampleAST: Node = {
     type: 'Array',
     elements: [
-        // {
-        //     type: 'Object',
-        //     members: [
-        //         { key: 'name', value: { type: 'StringLiteral', value: 'Alice' } },
-        //         { key: 'age', value: { type: 'NumberLiteral', value: 30 } },
-        //     ],
-        // },
-        // {
-        //     type: 'Object',
-        //     members: [
-        //         { key: 'name', value: { type: 'StringLiteral', value: 'Bob' } },
-        //         { key: 'age', value: { type: 'NumberLiteral', value: 25 } },
-        //     ],
-        // },
-        // {
-        //     type: 'CallExpression',
-        //     callee: { type: 'Identifier', name: 'getUser' },
-        //     arguments: [{ type: 'StringLiteral', value: 'Alice' }],
-        // },
-
-        { type: 'NumberLiteral', value: 25 },
-        { type: 'NumberLiteral', value: 25 },
-        { type: 'NumberLiteral', value: 25 },
+        {
+            type: 'Object',
+            members: [
+                { key: 'name', value: { type: 'StringLiteral', value: 'Alice' } },
+                { key: 'age', value: { type: 'NumberLiteral', value: 30 } },
+            ],
+        },
+        {
+            type: 'Object',
+            members: [
+                { key: 'name', value: { type: 'StringLiteral', value: 'Bob' } },
+                { key: 'age', value: { type: 'NumberLiteral', value: 25 } },
+            ],
+        },
+        {
+            type: 'CallExpression',
+            callee: { type: 'Identifier', name: 'getUser' },
+            arguments: [{ type: 'StringLiteral', value: 'Alice' }],
+        },
+        {
+            type: 'Array',
+            elements: [
+                { type: 'NumberLiteral', value: 1 },
+                { type: 'NumberLiteral', value: 2 },
+                { type: 'NumberLiteral', value: 3 },
+            ],
+        },
     ],
 }
 
