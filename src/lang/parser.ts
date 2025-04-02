@@ -1,5 +1,5 @@
 // Token types and interface
-type TokenType = 'Boolean' | 'Number' | 'String' | 'Identifier' | 'Operator' | 'Punctuation'
+type TokenType = 'Boolean' | 'Number' | 'String' | 'Identifier' | 'Operator' | 'Punctuation' | 'Spread'
 
 type Token = {
     type: TokenType
@@ -13,10 +13,13 @@ const tokenSpecs: [TokenType, RegExp][] = [
     ['Boolean', /^(true|false)\b/],
     ['Number', /^(\d+(\.\d+)?)/],
     ['String', /^"([^"]*)"/],
+
+    ['Spread', /^(\.\.)/],
+
     ['Operator', /^([+\-*\/&\?<>=%\^]{1,3})/],
     ['Identifier', /^(\$?[A-Za-z_][A-Za-z0-9_]*)/],
     // Punctuation: include [ ] { } : ( ) | .
-    ['Punctuation', /^([\[\]\{\}:()|.])/],
+    ['Punctuation', /^([\[\]\{\}:()|.;])/],
 ]
 
 function lex(input: string): Token[] {
@@ -60,6 +63,7 @@ export type Node =
     | PipeExpressionNode
     | MemberExpressionNode
     | BinaryExpressionNode
+    | SpreadExpressionNode
 
 type BooleanLiteralNode = {
     type: 'BooleanLiteral'
@@ -95,6 +99,13 @@ type GroupingExpressionNode = {
 type ArrayNode = {
     type: 'Array'
     elements: Node[]
+    startToken?: Token
+    endToken?: Token
+}
+
+type SpreadExpressionNode = {
+    type: 'SpreadExpression'
+    expression: Node
     startToken?: Token
     endToken?: Token
 }
@@ -304,13 +315,62 @@ function parsePrimary(tokens: Token[], posRef: { pos: number }): Node {
 // Parse arrays: [ elements ]
 function parseArray(tokens: Token[], posRef: { pos: number }): Node {
     const openBracket = expect(tokens, posRef, 'Punctuation', '[')
+
+    let lastRowEnding: number | null = null
     const elements: Node[] = []
     while (true) {
-        const next = peek(tokens, posRef.pos)
+        let next
+
+        next = peek(tokens, posRef.pos)
         if (!next) throw new Error('Unexpected end of input in array')
-        if (next.type === 'Punctuation' && next.value === ']') break
-        elements.push(parseExpression(tokens, posRef))
+
+        if (next.type === 'Punctuation' && next.value === ';') {
+            pop(tokens, posRef)
+
+            const lastRow = elements.slice(lastRowEnding ?? 0)
+            elements.splice(lastRowEnding ?? 0, lastRow.length, {
+                type: 'Array',
+                elements: lastRow,
+                startToken: openBracket,
+                endToken: next,
+            })
+
+            lastRowEnding = elements.length
+        }
+
+        next = peek(tokens, posRef.pos)
+        if (!next) throw new Error('Unexpected end of input in array')
+
+        if (next.type === 'Punctuation' && next.value === ']') {
+            if (lastRowEnding !== null && lastRowEnding < elements.length) {
+                // If we have a last row ending, we need to wrap all previous elements in a single array
+                const lastRow = elements.slice(lastRowEnding)
+                elements.splice(lastRowEnding, elements.length - lastRowEnding, {
+                    type: 'Array',
+                    elements: lastRow,
+                    startToken: openBracket,
+                    endToken: next,
+                })
+            }
+
+            break
+        }
+
+        const newItem = parseExpression(tokens, posRef)
+        const nextToken = peek(tokens, posRef.pos)
+        if (nextToken && nextToken.type === 'Spread') {
+            const spreadToken = pop(tokens, posRef)
+            elements.push({
+                type: 'SpreadExpression',
+                expression: newItem,
+                startToken: getStartToken(newItem),
+                endToken: spreadToken,
+            })
+        } else {
+            elements.push(newItem)
+        }
     }
+
     const closeBracket = expect(tokens, posRef, 'Punctuation', ']')
     return {
         type: 'Array',

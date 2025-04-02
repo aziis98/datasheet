@@ -34,6 +34,10 @@
         font-family: 'JetBrains Mono', monospace;
     }
 
+    strong {
+        font-weight: 500;
+    }
+
     ::selection {
         background: #5a83ff;
         color: #fff;
@@ -145,6 +149,7 @@
                     height: 100%;
 
                     min-width: 80ch;
+                    max-height: 20.5rem;
 
                     outline: none;
                     border: none;
@@ -206,8 +211,7 @@
                     place-content: center;
 
                     font-family: 'JetBrains Mono', monospace;
-                    font-size: 12px;
-                    font-weight: bold;
+                    font-size: 11px;
                     color: #666;
 
                     border-right: 1px solid #ccc;
@@ -244,6 +248,66 @@
                     &:not(:last-child) {
                         border-right: 1px solid #ccc;
                     }
+                }
+            }
+        }
+
+        &.grid {
+            display: grid;
+            grid-template-columns: repeat(var(--grid-columns), auto);
+            grid-template-rows: repeat(var(--grid-rows), auto);
+
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 0.35rem;
+            box-shadow: 0 0 0.5rem #0001;
+
+            overflow: clip;
+
+            > .row {
+                grid-column: 1 / -1;
+                grid-template-columns: subgrid;
+
+                &:not(:first-child) {
+                    border-top: 1px solid #ccc;
+                }
+
+                > .cell {
+                    padding: 0.25rem;
+
+                    &:not(:first-child) {
+                        border-left: 1px solid #ccc;
+                    }
+
+                    &:hover {
+                        background: #0000000d;
+                    }
+                }
+
+                > .header {
+                    background: #f4f4f4;
+
+                    padding: 0.125rem 0.25rem;
+                    place-content: center;
+
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #333;
+
+                    &:not(:first-child) {
+                        border-left: 1px solid #ccc;
+                    }
+                }
+
+                &.info {
+                    padding: 0.125rem 0.25rem;
+                    grid-template-columns: auto;
+
+                    place-content: center;
+                    place-items: center;
+
+                    font-size: 13px;
                 }
             }
         }

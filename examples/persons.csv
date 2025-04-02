@@ -1,0 +1,31 @@
+OrderID,CustomerName,Email,Product,Quantity,Price,OrderDate,Status
+1001,John Doe,john.doe@example.com,Laptop,1,1200.00,2024-04-01,Shipped
+1002,Jane Smith,jane.smith@example.com,Smartphone,2,800.00,2024-04-02,Pending
+1003,Mike Johnson,mike.johnson@example.com,Headphones,3,150.00,2024-04-02,Delivered
+1004,Alice Brown,alice.brown@example.com,Smartwatch,1,250.00,2024-04-03,Processing
+1005,Chris Wilson,chris.wilson@example.com,Monitor,2,300.00,2024-04-04,Shipped
+1006,Susan Lee,susan.lee@example.com,Keyboard,1,100.00,2024-04-05,Pending
+1007,Tom Clark,tom.clark@example.com,Mouse,2,50.00,2024-04-06,Delivered
+1008,Emma White,emma.white@example.com,Tablet,1,600.00,2024-04-07,Processing
+1009,Liam Harris,liam.harris@example.com,Desk Chair,1,200.00,2024-04-08,Shipped
+1010,Olivia Martin,olivia.martin@example.com,External SSD,2,180.00,2024-04-09,Pending
+1011,Noah Baker,noah.baker@example.com,Printer,1,220.00,2024-04-10,Shipped
+1012,Ava Carter,ava.carter@example.com,Router,1,130.00,2024-04-11,Processing
+1013,William Reed,william.reed@example.com,Webcam,2,90.00,2024-04-12,Delivered
+1014,Sophia Hall,sophia.hall@example.com,VR Headset,1,450.00,2024-04-13,Shipped
+1015,Benjamin Green,benjamin.green@example.com,Microphone,1,75.00,2024-04-14,Pending
+1016,Charlotte Adams,charlotte.adams@example.com,Smart Speaker,1,99.00,2024-04-15,Delivered
+1017,Daniel Parker,daniel.parker@example.com,Gaming Console,1,500.00,2024-04-16,Shipped
+1018,Mia Young,mia.young@example.com,Camera,1,700.00,2024-04-17,Processing
+1019,Lucas King,lucas.king@example.com,Wireless Charger,3,30.00,2024-04-18,Shipped
+1020,Amelia Wright,amelia.wright@example.com,Graphics Card,1,900.00,2024-04-19,Pending
+1021,Ethan Scott,ethan.scott@example.com,Standing Desk,1,350.00,2024-04-20,Delivered
+1022,Harper Evans,harper.evans@example.com,Bluetooth Earbuds,2,120.00,2024-04-21,Processing
+1023,Jack Turner,jack.turner@example.com,Smart Thermostat,1,199.00,2024-04-22,Shipped
+1024,Elijah Rivera,elijah.rivera@example.com,Portable Projector,1,320.00,2024-04-23,Delivered
+1025,Isabella Torres,isabella.torres@example.com,USB-C Hub,3,45.00,2024-04-24,Pending
+1026,Henry Ramirez,henry.ramirez@example.com,Mechanical Keyboard,1,140.00,2024-04-25,Shipped
+1027,Evelyn Peterson,evelyn.peterson@example.com,Power Bank,2,60.00,2024-04-26,Processing
+1028,James Murphy,james.murphy@example.com,Drone,1,850.00,2024-04-27,Shipped
+1029,Scarlett Rogers,scarlett.rogers@example.com,Electric Scooter,1,750.00,2024-04-28,Pending
+1030,Alexander Brooks,alexander.brooks@example.com,Smart Lock,1,180.00,2024-04-29,Delivered

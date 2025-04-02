@@ -1,3 +1,5 @@
+import Papa from 'papaparse'
+
 const removeEntry = Symbol('remove')
 
 export function matchTraverseObject(obj, predicate, replacement, path = []) {
@@ -33,3 +35,20 @@ export function matchTraverseObject(obj, predicate, replacement, path = []) {
 }
 
 matchTraverseObject.remove = removeEntry
+
+// Handle files from both drag and drop and file picker
+export function parseCSV(file) {
+    return new Promise((resolve, reject) => {
+        Papa.parse(file, {
+            // headers: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: results => {
+                resolve(results)
+            },
+            error: error => {
+                reject(error)
+            },
+        })
+    })
+}
