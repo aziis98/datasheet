@@ -1,15 +1,15 @@
-# 2025-03-31-data-notebook
+# DataSheet
 
-To install dependencies:
+Data exploration tool with custom scripting language for data manipulation
+
+## Usage
 
 ```bash
 bun install
 ```
 
-To run:
+## Development
 
 ```bash
-bun run index.ts
+bun dev
 ```
-
-This project was created using `bun init` in bun v1.2.6. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
