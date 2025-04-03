@@ -2,14 +2,18 @@ import clsx from 'clsx'
 import { render } from 'preact'
 import { useMemo, useState } from 'preact/hooks'
 import { parseSource } from './lang/parser.js'
-import { matchTraverseObject, parseCSV } from './utils.js'
-import { evaluateNode, evaluateNodeSafe, Table } from './lang/eval.js'
+import { parseCSV } from './utils.js'
+import { evaluateNodeSafe, extendContext, Table } from './lang/eval.js'
 import { applyTextEditorBehavior } from './editor.js'
 
 const DataValueRenderer = ({ value }) => {
     if (value === null || value === undefined) {
         return {
-            element: <div class="data nil">nil</div>,
+            element: (
+                <div title="nil" class="data dimmed">
+                    nil
+                </div>
+            ),
             depth: 0,
         }
     }
@@ -22,7 +26,7 @@ const DataValueRenderer = ({ value }) => {
 
         const rowElements = rows.map(row =>
             row.map(cell => {
-                const { element, depth } = DataValueRenderer({ value: cell })
+                const { element } = DataValueRenderer({ value: cell })
                 return element
             })
         )
@@ -30,6 +34,7 @@ const DataValueRenderer = ({ value }) => {
         return {
             element: (
                 <div
+                    title="table"
                     class="data grid"
                     style={{
                         ['--grid-columns']: rows[0].length,
@@ -71,7 +76,8 @@ const DataValueRenderer = ({ value }) => {
         if (
             value.length > 0 &&
             value.every(item => Array.isArray(item)) &&
-            value.every(item => item.length === value[0].length)
+            value.every(item => item.length === value[0].length) &&
+            value.length > 1
         ) {
             const rows = value.map(row =>
                 row.map(cell => {
@@ -86,6 +92,7 @@ const DataValueRenderer = ({ value }) => {
             return {
                 element: (
                     <div
+                        title="grid"
                         class="data grid"
                         style={{
                             ['--grid-columns']: value[0].length,
@@ -117,7 +124,7 @@ const DataValueRenderer = ({ value }) => {
 
         return {
             element: (
-                <div class={clsx('data', 'array', { compact: depth < 1 })}>
+                <div title="list" class={clsx('data', 'array', { compact: depth < 1 })}>
                     {value.map((item, index) => (
                         <div class="data item" key={index}>
                             <div class="data index">{index}</div>
@@ -141,7 +148,7 @@ const DataValueRenderer = ({ value }) => {
 
         return {
             element: (
-                <div class="data object">
+                <div title="object" class="data object">
                     {entries.map(({ key, element }, index) => (
                         <div class="data entry" key={index}>
                             <div class="data key">{key}</div>
@@ -155,19 +162,40 @@ const DataValueRenderer = ({ value }) => {
     }
     if (typeof value === 'string') {
         return {
-            element: <div class="data string">{value}</div>,
+            element:
+                value.length === 0 ? (
+                    <div title="string" class="data dimmed">
+                        empty string
+                    </div>
+                ) : value.trim().length === 0 ? (
+                    <div title="string" class="data string">
+                        <code>{JSON.stringify(value).slice(1, -1).replaceAll(' ', '⎵')}</code>
+                    </div>
+                ) : (
+                    <div title="string" class="data string">
+                        {value}
+                    </div>
+                ),
             depth: 0,
         }
     }
     if (typeof value === 'number') {
         return {
-            element: <div class="data number">{value}</div>,
+            element: (
+                <div title="number" class="data number">
+                    {value}
+                </div>
+            ),
             depth: 0,
         }
     }
     if (typeof value === 'boolean') {
         return {
-            element: <div class="data boolean">{value ? 'true' : 'false'}</div>,
+            element: (
+                <div title="boolean" class="data boolean">
+                    {value ? 'true' : 'false'}
+                </div>
+            ),
             depth: 0,
         }
     }
@@ -180,93 +208,107 @@ const DataValueRenderer = ({ value }) => {
     }
 }
 
-const Cell = ({ input, setInput, output, metadata }) => {
+const Cell = ({ input, setInput, setResource, output, metadata }) => {
+    const [dragging, setDragging] = useState(false)
+
     const { element: outputElement, depth } = DataValueRenderer({ value: output })
 
     return (
-        <div class="cell">
-            <div
-                class="input"
-                onDragOver={e => {
-                    e.preventDefault()
-                }}
-                onDragEnter={e => {
-                    e.preventDefault()
-                }}
-                onDragLeave={e => {
-                    e.preventDefault()
-                }}
-                onDrop={async e => {
-                    e.preventDefault()
-                    const file = e.dataTransfer.files[0]
-                    if (file) {
-                        const { data } = await parseCSV(file)
+        <div
+            class="cell"
+            onDragOver={e => {
+                e.preventDefault()
+                setDragging(true)
+            }}
+            onDragEnter={e => {
+                e.preventDefault()
+                setDragging(true)
+            }}
+            onDragLeave={e => {
+                e.preventDefault()
+                setDragging(false)
+            }}
+            onDrop={async e => {
+                e.preventDefault()
+                setDragging(false)
 
-                        console.log('data', data)
-
-                        const [headers, ...rows] = data
-
-                        const table = new Table(headers, rows)
-                        setInput(table.toCode())
-                    }
-                }}
-            >
-                <div class="metadata-left">{metadata}</div>
-                <div class="content">
-                    <textarea
-                        value={input}
-                        onKeyDown={e => {
-                            const newText = applyTextEditorBehavior(e)
-                            if (newText !== null) {
-                                setInput(newText)
-                            }
-                        }}
-                        onInput={e => setInput(e.target.value)}
-                        placeholder="Type something..."
-                        rows={Math.max(1, input.split('\n').length)}
-                    />
+                const file = e.dataTransfer.files[0]
+                if (file) {
+                    const { headers, rows } = await parseCSV(file)
+                    setResource(file.name, new Table(headers, rows))
+                    setInput(`resource("${file.name}")`)
+                }
+            }}
+        >
+            {dragging ? (
+                <div class="drop-zone">
+                    <div class="text">Drop your file here</div>
                 </div>
-            </div>
-            <div class="output">{outputElement}</div>
+            ) : (
+                <>
+                    <div class="input">
+                        <div class="metadata-left">{metadata}</div>
+                        <div class="content">
+                            <textarea
+                                value={input}
+                                onKeyDown={e => {
+                                    const newText = applyTextEditorBehavior(e)
+                                    if (newText !== null) {
+                                        setInput(newText)
+                                    }
+                                }}
+                                onInput={e => setInput(e.target.value)}
+                                autocomplete="off"
+                                spellcheck="false"
+                                autocorrect="off"
+                                autocapitalize="off"
+                                placeholder="Type something..."
+                                rows={Math.max(1, input.split('\n').length)}
+                            />
+                        </div>
+                    </div>
+                    <div class="output">
+                        <div class="overflow-scrollable">{outputElement}</div>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
 
 const Notebook = () => {
-    // const cells = [
-    //     {
-    //         input: '[1 2 3]',
-    //         output: [1, 2, 3],
-    //     },
-    //     {
-    //         input: '[4 5 6]',
-    //         output: [4, 5, 6],
-    //     },
-    //     {
-    //         input: `
-    //             [
-    //                 { foo: 1, bar: 2 }
-    //                 { foo: 3, bar: 4 }
-    //                 { foo: 5, bar: 6 }
-    //             ]
-    //         `
-    //             .replace(/\s+/g, ' ')
-    //             .trim(),
-    //         output: [
-    //             { foo: 1, bar: 2 },
-    //             { foo: 3, bar: 4 },
-    //             { foo: 5, bar: 6 },
-    //         ],
-    //     },
-    // ]
+    const [resources, setResources] = useState({})
 
     const [exampleInput, setExampleInput] = useState(`table(["a" "a" "a"] [1 2 3; 4 5 6])`)
     const inputAst = useMemo(() => parseSource(exampleInput), [exampleInput])
-    const evaluatedOutput = useMemo(() => evaluateNodeSafe(inputAst), [inputAst])
+    const evaluatedOutput = useMemo(
+        () =>
+            evaluateNodeSafe(
+                inputAst,
+                extendContext({
+                    resource: name => {
+                        if (resources[name]) {
+                            return resources[name]
+                        }
+                    },
+                })
+            ),
+        [inputAst]
+    )
 
     return (
         <div class="notebook">
-            <Cell input={exampleInput} setInput={setExampleInput} output={evaluatedOutput?.result ?? inputAst} />
+            <Cell
+                input={exampleInput}
+                setInput={setExampleInput}
+                setResource={(name, value) =>
+                    setResources({
+                        ...resources,
+                        [name]: value,
+                    })
+                }
+                output={evaluatedOutput?.result ?? evaluatedOutput}
+            />
         </div>
     )
 }

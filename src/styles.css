@@ -45,6 +45,27 @@
 }
 
 @layer components {
+    button {
+        display: grid;
+        place-content: center;
+
+        padding: 0.125rem 0.5rem;
+        border: none;
+        border-radius: 0.35rem;
+        box-shadow: 0 0 0.5rem #0001;
+
+        background: #ddd;
+        color: #333;
+
+        font-weight: 600;
+
+        cursor: pointer;
+
+        &:hover {
+            background: #ccc;
+        }
+    }
+
     nav {
         display: grid;
         grid-template-columns: auto 1fr auto;
@@ -104,6 +125,28 @@
 
         place-content: center;
 
+        > .drop-zone {
+            grid-row: span 2;
+
+            background: #e0e0e0;
+
+            box-shadow: inset 0 0 0.5rem #0002;
+            border: 2px dashed #bbb;
+            border-radius: 0.35rem;
+
+            min-width: 40rem;
+            min-height: 10rem;
+
+            display: grid;
+            place-content: center;
+
+            .text {
+                color: #888;
+                font-size: 18px;
+                font-weight: 500;
+            }
+        }
+
         > .input {
             display: grid;
 
@@ -135,7 +178,7 @@
                 font-size: 15px;
                 color: #333;
 
-                min-width: 80ch;
+                min-width: 40rem;
 
                 textarea,
                 input[type='Text'] {
@@ -148,7 +191,7 @@
                     width: 100%;
                     height: 100%;
 
-                    min-width: 80ch;
+                    min-width: 40rem;
                     max-height: 20.5rem;
 
                     outline: none;
@@ -174,7 +217,6 @@
             padding-top: 0.75rem;
 
             display: grid;
-            place-content: center;
 
             background: #ededed;
             border: 1px solid #ddd;
@@ -182,6 +224,14 @@
             border-bottom-right-radius: 0.35rem;
 
             box-shadow: inset 0 0 0.5rem #0001;
+            overflow: auto;
+
+            > .overflow-scrollable {
+                min-width: 100%;
+                width: max-content;
+                display: grid;
+                place-content: center;
+            }
         }
     }
 
@@ -254,8 +304,8 @@
 
         &.grid {
             display: grid;
-            grid-template-columns: repeat(var(--grid-columns), auto);
-            grid-template-rows: repeat(var(--grid-rows), auto);
+            grid-template-columns: repeat(var(--grid-columns), max-content);
+            grid-template-rows: repeat(var(--grid-rows), max-content);
 
             background: #fff;
             border: 1px solid #ccc;
@@ -273,7 +323,8 @@
                 }
 
                 > .cell {
-                    padding: 0.25rem;
+                    padding: 0.125rem 0.25rem;
+                    place-content: normal;
 
                     &:not(:first-child) {
                         border-left: 1px solid #ccc;
@@ -287,13 +338,14 @@
                 > .header {
                     background: #f4f4f4;
 
-                    padding: 0.125rem 0.25rem;
+                    padding: 0.25rem 0.5rem 0.125rem;
                     place-content: center;
 
-                    font-family: 'JetBrains Mono', monospace;
-                    font-size: 14px;
+                    font-size: 13px;
                     font-weight: 500;
                     color: #333;
+
+                    white-space: nowrap;
 
                     &:not(:first-child) {
                         border-left: 1px solid #ccc;
@@ -301,7 +353,7 @@
                 }
 
                 &.info {
-                    padding: 0.125rem 0.25rem;
+                    padding: 0.25rem 0.25rem;
                     grid-template-columns: auto;
 
                     place-content: center;
@@ -353,7 +405,8 @@
 
         &.number {
             padding: 0.125rem 0.25rem;
-            justify-content: center;
+            justify-self: center;
+            place-content: center;
 
             font-size: 14px;
             color: #4169e1;
@@ -362,11 +415,15 @@
 
         &.string {
             padding: 0.125rem 0.25rem;
-            justify-content: center;
 
             font-size: 14px;
-            color: #cc8500;
-            font-weight: 500;
+            color: #b38600;
+        }
+
+        &.dimmed {
+            font-style: italic;
+            font-size: 13px;
+            color: #888;
         }
     }
 }

@@ -2,6 +2,7 @@ import { type Node } from './parser'
 
 export type Context = {
     parent: Context | null
+
     bindings: Record<string, any>
 }
 
@@ -62,7 +63,7 @@ export function evaluateNode(node: Node, context: Context = BASE_CONTEXT): any {
             return node.value
 
         case 'Array':
-            const arrayResults = node.elements.flatMap(element => {
+            return node.elements.flatMap(element => {
                 if (element.type === 'SpreadExpression') {
                     const spreadValue = evaluateNode(element.expression, context)
                     if (!Array.isArray(spreadValue)) {
@@ -75,8 +76,6 @@ export function evaluateNode(node: Node, context: Context = BASE_CONTEXT): any {
                 }
             })
 
-            return arrayResults
-
         case 'Object':
             const objectResults = Object.fromEntries(
                 node.members.map(member => [member.key, evaluateNode(member.value, context)])
@@ -85,7 +84,7 @@ export function evaluateNode(node: Node, context: Context = BASE_CONTEXT): any {
             return objectResults
 
         case 'Identifier':
-            const value = context.bindings[node.name]
+            const value = getFromContext(context, node.name)
             if (value === undefined) {
                 throw new Error(`Undefined identifier: ${node.name}`)
             }
@@ -113,6 +112,23 @@ export function evaluateNode(node: Node, context: Context = BASE_CONTEXT): any {
     }
 
     throw new Error(`Unknown node type: ${node.type}`)
+}
+
+export function getFromContext(context: Context, name: string): any {
+    let currentContext: Context | null = context
+
+    while (currentContext) {
+        if (name in currentContext.bindings) {
+            return currentContext.bindings[name]
+        }
+        currentContext = currentContext.parent
+    }
+
+    throw new Error(`Identifier not found in context: ${name}`)
+}
+
+export function extendContext(bindings: Record<string, any>, parent: Context = BASE_CONTEXT): Context {
+    return { parent, bindings }
 }
 
 export function evaluateNodeSafe(node: Node, context: Context = BASE_CONTEXT): { result: any } | { error: string } {

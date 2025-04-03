@@ -40,11 +40,22 @@ matchTraverseObject.remove = removeEntry
 export function parseCSV(file) {
     return new Promise((resolve, reject) => {
         Papa.parse(file, {
-            // headers: true,
-            dynamicTyping: true,
             skipEmptyLines: true,
             complete: results => {
-                resolve(results)
+                const [headers, ...rows] = results.data
+
+                // convert values to numbers only if the whole column is numeric
+                const isNumeric = s => /^\d+(\.\d+)?$/.test(s)
+
+                headers.forEach((header, index) => {
+                    if (rows.every(row => isNumeric(row[index]))) {
+                        rows.forEach(row => {
+                            row[index] = Number(row[index])
+                        })
+                    }
+                })
+
+                resolve({ headers, rows })
             },
             error: error => {
                 reject(error)
