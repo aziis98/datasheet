@@ -240,37 +240,35 @@ const Cell = ({ input, setInput, setResource, output, metadata }) => {
                 }
             }}
         >
-            {dragging ? (
+            <div class="input">
+                <div class="metadata-left">{metadata}</div>
+                <div class="content">
+                    <textarea
+                        value={input}
+                        onKeyDown={e => {
+                            const newText = applyTextEditorBehavior(e)
+                            if (newText !== null) {
+                                setInput(newText)
+                            }
+                        }}
+                        onInput={e => setInput(e.target.value)}
+                        autocomplete="off"
+                        spellcheck="false"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        placeholder="Type something..."
+                        rows={Math.max(1, input.split('\n').length)}
+                    />
+                </div>
+            </div>
+            <div class="output">
+                <div class="overflow-scrollable">{outputElement}</div>
+            </div>
+
+            {dragging && (
                 <div class="drop-zone">
                     <div class="text">Drop your file here</div>
                 </div>
-            ) : (
-                <>
-                    <div class="input">
-                        <div class="metadata-left">{metadata}</div>
-                        <div class="content">
-                            <textarea
-                                value={input}
-                                onKeyDown={e => {
-                                    const newText = applyTextEditorBehavior(e)
-                                    if (newText !== null) {
-                                        setInput(newText)
-                                    }
-                                }}
-                                onInput={e => setInput(e.target.value)}
-                                autocomplete="off"
-                                spellcheck="false"
-                                autocorrect="off"
-                                autocapitalize="off"
-                                placeholder="Type something..."
-                                rows={Math.max(1, input.split('\n').length)}
-                            />
-                        </div>
-                    </div>
-                    <div class="output">
-                        <div class="overflow-scrollable">{outputElement}</div>
-                    </div>
-                </>
             )}
         </div>
     )

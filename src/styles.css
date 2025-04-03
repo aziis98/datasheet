@@ -121,33 +121,15 @@
 
     .cell {
         display: grid;
+        grid-template-columns: auto;
         grid-template-rows: auto auto;
 
         place-content: center;
 
-        > .drop-zone {
-            grid-row: span 2;
-
-            background: #e0e0e0;
-
-            box-shadow: inset 0 0 0.5rem #0002;
-            border: 2px dashed #bbb;
-            border-radius: 0.35rem;
-
-            min-width: 40rem;
-            min-height: 10rem;
-
-            display: grid;
-            place-content: center;
-
-            .text {
-                color: #888;
-                font-size: 18px;
-                font-weight: 500;
-            }
-        }
-
         > .input {
+            grid-row: 1 / 2;
+            grid-column: 1 / -1;
+
             display: grid;
 
             background: #fff;
@@ -211,6 +193,9 @@
         }
 
         > .output {
+            grid-row: 2 / 3;
+            grid-column: 1 / -1;
+
             margin-top: -0.25rem;
 
             padding: 0.5rem;
@@ -231,6 +216,29 @@
                 width: max-content;
                 display: grid;
                 place-content: center;
+            }
+        }
+
+        > .drop-zone {
+            grid-row: 1 / 3;
+            grid-column: 1 / -1;
+
+            z-index: 1;
+            pointer-events: none;
+
+            background: #e0e0e0;
+
+            box-shadow: inset 0 0 0.5rem #0002;
+            border: 2px dashed #bbb;
+            border-radius: 0.35rem;
+
+            display: grid;
+            place-content: center;
+
+            .text {
+                color: #888;
+                font-size: 18px;
+                font-weight: 500;
             }
         }
     }
@@ -425,5 +433,15 @@
             font-size: 13px;
             color: #888;
         }
+    }
+}
+
+@layer utilities {
+    .hidden {
+        display: none;
+    }
+
+    .no-pointer-events {
+        pointer-events: none;
     }
 }
