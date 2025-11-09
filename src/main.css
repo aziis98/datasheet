@@ -1,0 +1,57 @@
+@layer base, typography, components, utilities;
+
+@layer base {
+    body {
+        margin: 0;
+        font-family: "Source Sans Pro", system-ui, sans-serif;
+        background-color: #f0f0f0;
+        color: #333;
+    }
+}
+
+@layer typography {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family: "Source Sans Pro", sans-serif;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    p {
+        line-height: 1.5;
+        margin-bottom: 1em;
+    }
+}
+
+@layer components {
+    body {
+        display: grid;
+        justify-items: center;
+        font-size: 16px;
+    }
+
+    input,
+    textarea {
+        font-family: "JetBrains Mono Variable", monospace;
+        font-size: 15px;
+        outline: none;
+    }
+
+    .card {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 0.25rem;
+        box-shadow: 0 0.125rem 0.35rem rgba(0, 0, 0, 0.1);
+        padding: 0.5rem;
+    }
+
+    @extracted-css;
+}
+
+@layer utilities {
+    /* ... */
+}
