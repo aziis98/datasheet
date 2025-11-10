@@ -23,7 +23,7 @@ export const TextViewer = ({ value }: ViewerProps<TextValue>) => {
                     }
                 `,
             ]}
-            rows={Math.max(2, content.get().split("\n").length)}
+            rows={Math.max(1, content.get().split("\n").length)}
             value={content.get()}
             onInput={e => content.update(() => e.currentTarget.value)}
         />

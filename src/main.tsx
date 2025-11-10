@@ -1,4 +1,4 @@
-import { Icon } from "@iconify/react"
+import { Icon } from "@/components/Icon"
 import { render } from "preact"
 import { css } from "preact-css-extract/comptime"
 import { useState } from "preact/hooks"
@@ -19,15 +19,12 @@ const QueryBar = ({}) => {
     return (
         <textarea
             placeholder="Enter your query..."
-            class={css`
-                width: 100%;
-
-                border: 1px solid #ccc;
-                border-radius: 0.25rem;
-                box-shadow: 0 0.125rem 0.35rem rgba(0, 0, 0, 0.1);
-
-                padding: 0.5rem;
-            `}
+            classList={[
+                "card",
+                css`
+                    width: 100%;
+                `,
+            ]}
             value={query}
             onInput={e => setQuery(e.currentTarget.value)}
             rows={query.split("\n").length || 1}
@@ -52,16 +49,17 @@ const Outline = ({ entries }: { entries: Optic<Entry[]> }) => {
             <div
                 class={css`
                     display: grid;
+                    gap: 0.25rem;
                     grid-auto-flow: column;
-                    align-items: center;
                     justify-content: start;
+                    align-items: center;
 
                     gap: 0.5rem;
                     font-weight: 600;
-                    font-size: 14px;
                 `}
             >
-                <Icon icon="material-symbols:table-outline" /> Tables
+                <Icon icon="ph:table" />
+                <div>Tables</div>
             </div>
             <div
                 class={css`
@@ -71,21 +69,28 @@ const Outline = ({ entries }: { entries: Optic<Entry[]> }) => {
                 `}
             >
                 {entries.items().map(entry => {
-                    const { id, name } = entry.get()
+                    const { id, name, value } = entry.get()
                     return (
                         <div
                             key={id}
-                            class={css`
-                                padding: 0.25rem 0.5rem;
-                                border-radius: 0.25rem;
+                            classList={[
+                                "grid-h",
+                                css`
+                                    grid-template-columns: auto 1fr auto;
 
-                                &:hover {
-                                    background: #f0f0f0;
-                                    cursor: pointer;
-                                }
-                            `}
+                                    padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+                                    border-radius: 0.25rem;
+
+                                    &:hover {
+                                        background: #f0f0f0;
+                                        cursor: pointer;
+                                    }
+                                `,
+                            ]}
                         >
-                            {name}
+                            <Icon icon="ph:database" />
+                            <div class="text-small">{name}</div>
+                            <div class="text-small text-dimmed">{value.type}</div>
                         </div>
                     )
                 })}

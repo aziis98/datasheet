@@ -1,11 +1,13 @@
 @layer base, typography, components, utilities;
 
+:root {
+    color-scheme: light dark;
+}
+
 @layer base {
     body {
         margin: 0;
         font-family: "Source Sans Pro", system-ui, sans-serif;
-        background-color: #f0f0f0;
-        color: #333;
     }
 }
 
@@ -29,9 +31,14 @@
 
 @layer components {
     body {
+        background-color: light-dark(#f0f0f0, #333);
+        color: light-dark(#333, #ddd);
+
         display: grid;
         justify-items: center;
         font-size: 16px;
+
+        user-select: none;
     }
 
     input,
@@ -42,8 +49,8 @@
     }
 
     .card {
-        background: #fff;
-        border: 1px solid #ccc;
+        background: light-dark(#fff, #444);
+        border: 1px solid light-dark(#ccc, #555);
         border-radius: 0.25rem;
         box-shadow: 0 0.125rem 0.35rem rgba(0, 0, 0, 0.1);
         padding: 0.5rem;
@@ -53,5 +60,19 @@
 }
 
 @layer utilities {
-    /* ... */
+    .grid-h {
+        display: grid;
+        gap: 0.25rem;
+        grid-auto-flow: column;
+        justify-content: start;
+        align-items: center;
+    }
+
+    .text-small {
+        font-size: 14px;
+    }
+
+    .text-dimmed {
+        color: light-dark(#888, #888);
+    }
 }
