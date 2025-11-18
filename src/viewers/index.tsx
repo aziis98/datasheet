@@ -1,9 +1,14 @@
 import type { JSX } from "preact"
-import type { ViewerProps } from "./types"
+import type { Value, ViewerProps } from "./types"
 
 const viewerModules: Record<string, any> = import.meta.glob("./*.tsx", { eager: true })
 
 console.log("Loaded viewer modules:", Object.keys(viewerModules))
+
+export const ViewerIcons: Record<Value["type"], string> = {
+    text: "ph:text-t",
+    table: "ph:database",
+}
 
 export const Viewers = Object.fromEntries(
     Object.entries(viewerModules)

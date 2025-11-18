@@ -1,26 +1,21 @@
 import { useState } from "preact/hooks"
 import { Lens } from "./lenses"
 
-// export type Optic<T> = {
-//     get: () => T
-//     update: (updater: (current: T) => T) => void
-// }
-
 export class Optic<T> {
-    #getter: () => T
+    #value: T
     #updater: (updater: (current: T) => T) => void
 
-    constructor(getter: () => T, updater: (updater: (current: T) => T) => void) {
-        this.#getter = getter
+    constructor(value: T, updater: (updater: (current: T) => T) => void) {
+        this.#value = value
         this.#updater = updater
-    }
-
-    get() {
-        return this.#getter()
     }
 
     update(updater: (current: T) => T) {
         this.#updater(updater)
+    }
+
+    get(): T {
+        return this.#value
     }
 
     set(value: T) {
@@ -28,12 +23,9 @@ export class Optic<T> {
     }
 
     lens<K>(lens: Lens<T, K>): Optic<K> {
-        return new Optic<K>(
-            () => lens.get(this.#getter()),
-            updater => {
-                this.#updater(current => lens.set(current, updater(lens.get(current))))
-            }
-        )
+        return new Optic<K>(lens.get(this.#value), updater => {
+            this.#updater(current => lens.set(current, updater(lens.get(current))))
+        })
     }
 
     prop<K extends keyof T>(key: K): Optic<T[K]> {
@@ -62,7 +54,7 @@ export class Optic<T> {
      * For Optic<T> where T is an object type, returns an array of [key, Optic<value>] pairs.
      */
     entries(): [string, Optic<T[keyof T]>][] {
-        const obj = this.get() as unknown as Record<string, any>
+        const obj = this.#value as unknown as Record<string, any>
         return Object.keys(obj).map(key => [key, this.prop(key as keyof T)] satisfies [string, Optic<T[keyof T]>])
     }
 
@@ -70,41 +62,48 @@ export class Optic<T> {
      * For Optic<T> where T is an object type, returns an array of [Optic<key>, Optic<value>] pairs.
      */
     entriesKV(): [Optic<keyof T>, Optic<T[keyof T]>][] {
-        const obj = this.get() as unknown as Record<string, any>
+        const obj = this.#value as unknown as Record<string, any>
         return Object.keys(obj).map<[Optic<keyof T>, Optic<T[keyof T]>]>(stringKey => {
             const key = stringKey as keyof T
 
             return [
-                new Optic<keyof T>(
-                    () => key,
-                    updater => {
-                        this.#updater(current => {
-                            const value = current[key]
-                            const newKey = updater(key)
-                            if (newKey === key) {
-                                return current
-                            }
-                            const { [key]: _, ...rest } = current as any
-                            return {
-                                ...rest,
-                                [newKey]: value,
-                            } as T
-                        })
-                    }
-                ),
+                new Optic<keyof T>(key, updater => {
+                    this.#updater(current => {
+                        const value = current[key]
+                        const newKey = updater(key)
+                        if (newKey === key) {
+                            return current
+                        }
+                        const { [key]: _, ...rest } = current as any
+                        return {
+                            ...rest,
+                            [newKey]: value,
+                        } as T
+                    })
+                }),
                 this.prop(key),
             ]
         })
     }
+
+    asHook(): [T, (value: T | ((current: T) => T)) => void] {
+        return [
+            this.#value,
+            (value: T | ((current: T) => T)) => {
+                if (typeof value === "function") {
+                    this.#updater(value as (current: T) => T)
+                } else {
+                    this.#updater(() => value as T)
+                }
+            },
+        ]
+    }
 }
 
-export const useOptic = <T>(initialValue: T) => {
+export const useOpticState = <T>(initialValue: T) => {
     const [value, setValue] = useState<T>(initialValue)
 
-    return new Optic<T>(
-        () => value,
-        updater => {
-            setValue(current => updater(current))
-        }
-    )
+    return new Optic<T>(value, updater => {
+        setValue(current => updater(current))
+    })
 }
