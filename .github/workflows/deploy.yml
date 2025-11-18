@@ -37,7 +37,7 @@ jobs:
               run: bun install
 
             - name: Build with Vite
-              run: bun run build
+              run: bun run build --base=/datasheet
 
             - name: Upload artifact
               uses: actions/upload-pages-artifact@v3
