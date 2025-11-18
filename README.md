@@ -1,6 +1,6 @@
 # DataSheet
 
-<img alt="image" src="https://github.com/user-attachments/assets/3be29f55-a42a-4fa0-9a9e-cc76cb0543b3" />
+<img alt="image" src="https://github.com/user-attachments/assets/92ba2561-871a-4472-b3d3-37542e59b244" />
 
 A tiny, modern dataset viewer and query playground built with Preact and Vite.
 
