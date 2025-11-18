@@ -1,5 +1,7 @@
 # DataSheet
 
+<img alt="image" src="https://github.com/user-attachments/assets/3be29f55-a42a-4fa0-9a9e-cc76cb0543b3" />
+
 A tiny, modern dataset viewer and query playground built with Preact and Vite.
 
 This project provides a fast, local UI for experimenting with tabular and text data, viewing result sets, and composing quick JavaScript-style queries inside a query bar — useful for prototyping data-centric interfaces and building a lightweight "datasheet" experience.
