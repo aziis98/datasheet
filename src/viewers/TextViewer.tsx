@@ -8,6 +8,8 @@ export const TextViewer = ({ value }: ViewerProps<TextValue>) => {
     return (
         <AutosizeInput
             classList={css`
+                box-sizing: content-box;
+
                 font-family: "Source Sans Pro", sans-serif;
                 font-size: 16px;
                 line-height: 1.5;

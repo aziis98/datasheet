@@ -1,11 +1,24 @@
-import { useState } from "preact/hooks"
+import type { RefObject } from "preact"
+import { useEffect, useRef, useState } from "preact/hooks"
 import { Lens } from "./lenses"
+
+export type UpdaterFn<T> = (updater: (current: T) => T) => void
 
 export class Optic<T> {
     #value: T
-    #updater: (updater: (current: T) => T) => void
+    #updater: UpdaterFn<T>
 
-    constructor(value: T, updater: (updater: (current: T) => T) => void) {
+    static of<T>(value: T, updater: UpdaterFn<T>) {
+        return new Optic<T>(value, updater)
+    }
+
+    static ofFrozen<T>(value: T) {
+        return new Optic<T>(value, () => {
+            throw new Error("Cannot update a frozen Optic")
+        })
+    }
+
+    constructor(value: T, updater: UpdaterFn<T>) {
         this.#value = value
         this.#updater = updater
     }
@@ -48,6 +61,15 @@ export class Optic<T> {
     items(): Optic<T extends Array<infer U> ? U : never>[] {
         const array = this.get() as unknown as Array<any>
         return array.map((_, index) => this.at(index)) as unknown as Optic<T extends Array<infer U> ? U : never>[]
+    }
+
+    arrayAppend(...items: T extends Array<infer U> ? U[] : never[]) {
+        this.#updater(current => {
+            if (Array.isArray(current)) {
+                return [...current, ...items] as T
+            }
+            return current
+        })
     }
 
     /**
@@ -106,4 +128,87 @@ export const useOpticState = <T>(initialValue: T) => {
     return new Optic<T>(value, updater => {
         setValue(current => updater(current))
     })
+}
+
+export const useEventListener = <K extends keyof WindowEventMap>(
+    element: Window,
+    eventName: K,
+    handler: (event: WindowEventMap[K]) => void
+) => {
+    const savedHandler = useRef<(event: WindowEventMap[K]) => void>()
+    savedHandler.current = handler
+
+    useEffect(() => {
+        const eventListener = (event: WindowEventMap[K]) => {
+            savedHandler.current?.(event)
+        }
+
+        element.addEventListener(eventName, eventListener)
+
+        return () => {
+            element.removeEventListener(eventName, eventListener)
+        }
+    }, [eventName, element])
+}
+
+export const useClickOutside = (ref: RefObject<HTMLElement>, handler: (event: MouseEvent) => void) => {
+    useEffect(() => {
+        const listener = (event: MouseEvent) => {
+            if (!ref.current || ref.current.contains(event.target as Node)) {
+                return
+            }
+            handler(event)
+        }
+
+        document.addEventListener("mousedown", listener)
+
+        return () => {
+            document.removeEventListener("mousedown", listener)
+        }
+    }, [ref, handler])
+}
+
+export const useLocalStorage = <T>(key: string, initialValue: T) => {
+    const [storedValue, setStoredValue] = useState<T>(() => {
+        if (typeof window === "undefined") {
+            return initialValue
+        }
+        try {
+            const item = window.localStorage.getItem(key)
+            return item ? JSON.parse(item) : initialValue
+        } catch (error) {
+            console.warn(`Error reading localStorage key "${key}":`, error)
+            return initialValue
+        }
+    })
+
+    const setValue = (value: T | ((val: T) => T)) => {
+        try {
+            const valueToStore = value instanceof Function ? value(storedValue) : value
+            setStoredValue(valueToStore)
+            if (typeof window !== "undefined") {
+                window.localStorage.setItem(key, JSON.stringify(valueToStore))
+            }
+        } catch (error) {
+            console.warn(`Error setting localStorage key "${key}":`, error)
+        }
+    }
+
+    return [storedValue, setValue] as const
+}
+
+export const useTimer = (interval: number, callback: () => void) => {
+    const savedCallback = useRef<() => void>()
+    savedCallback.current = callback
+
+    useEffect(() => {
+        const tick = () => {
+            savedCallback.current?.()
+        }
+
+        if (interval !== null) {
+            const id = setInterval(tick, interval)
+            return () => clearInterval(id)
+        }
+    }, [interval])
 }

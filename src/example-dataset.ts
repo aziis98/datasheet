@@ -3,26 +3,11 @@ import type { Value } from "./viewers/types"
 
 export const EXAMPLE_DATASET: {
     id: string
-    name: string
-    value: Value
+    content: Value
 }[] = [
     {
-        id: "1",
-        name: "company-notes",
-        value: {
-            type: "text",
-            content: dedent(`
-                Sample dataset designed for experimenting with joins. 
-                'customers' references 'cities' via city_id. 'orders' 
-                reference customers via customer_id. There are also products
-                & order_items to experiment with many-to-one joins.
-            `),
-        },
-    },
-    {
-        id: "2",
-        name: "customers",
-        value: {
+        id: "customers",
+        content: {
             type: "table",
             columns: ["id", "name", "city_id", "email", "signup_date"],
             data: [
@@ -65,9 +50,8 @@ export const EXAMPLE_DATASET: {
         },
     },
     {
-        id: "3",
-        name: "cities",
-        value: {
+        id: "cities",
+        content: {
             type: "table",
             columns: ["id", "name", "state", "population"],
             data: [
@@ -99,9 +83,8 @@ export const EXAMPLE_DATASET: {
         },
     },
     {
-        id: "4",
-        name: "orders",
-        value: {
+        id: "orders",
+        content: {
             type: "table",
             columns: ["id", "customer_id", "total", "date", "status"],
             data: [
@@ -144,9 +127,8 @@ export const EXAMPLE_DATASET: {
         },
     },
     {
-        id: "5",
-        name: "products",
-        value: {
+        id: "products",
+        content: {
             type: "table",
             columns: ["id", "sku", "name", "price"],
             data: [
@@ -172,9 +154,8 @@ export const EXAMPLE_DATASET: {
         },
     },
     {
-        id: "6",
-        name: "order_items",
-        value: {
+        id: "order_items",
+        content: {
             type: "table",
             columns: ["id", "order_id", "product_id", "qty", "item_total"],
             data: [
@@ -207,6 +188,18 @@ export const EXAMPLE_DATASET: {
                     { type: "text", content: "39.98" },
                 ],
             ],
+        },
+    },
+    {
+        id: "company_notes",
+        content: {
+            type: "text",
+            content: dedent(`
+                Sample dataset designed for experimenting with joins. 
+                'customers' references 'cities' via city_id. 'orders' 
+                reference customers via customer_id. There are also products
+                & order_items to experiment with many-to-one joins.
+            `),
         },
     },
 ]

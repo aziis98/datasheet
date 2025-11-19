@@ -1,5 +1,5 @@
-import { arrayRepeat } from "@/lib/utils"
 import { css } from "preact-css-extract/comptime"
+import { useState } from "preact/hooks"
 import type { TableValue, Value, ViewerProps } from "./types"
 
 type RenderedCell = {
@@ -13,10 +13,28 @@ type RenderedCell = {
 const scrollAreaClass = css`
     position: relative;
     overflow: auto;
-    max-height: 50vh;
+    max-height: 60vh;
 
     color: var(--text);
     background: var(--bg);
+
+    &::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: hsl(210 8% 50% / 0.5);
+        border-radius: 10px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: hsl(210 8% 50% / 0.75);
+    }
 `
 
 const tableClass = css`
@@ -35,6 +53,7 @@ const tableClass = css`
 
         text-transform: uppercase;
         letter-spacing: 0.0625rem;
+        white-space: nowrap;
 
         font-size: 12px;
         font-weight: 600;
@@ -43,6 +62,11 @@ const tableClass = css`
         padding: 0.25rem 0.5rem;
         text-align: left;
         border-bottom: 1px solid var(--border);
+
+        &.selected {
+            --border: hsl(210 50% 80%);
+            background: hsl(210 50% 90%);
+        }
     }
 
     thead th:not(:first-child) {
@@ -54,6 +78,11 @@ const tableClass = css`
         border-bottom: 1px solid var(--border-divider);
         border-right: 1px solid var(--border-divider);
         white-space: nowrap;
+
+        &:first-child {
+            width: 0;
+            font-size: 13px;
+        }
     }
 
     tbody td:last-child,
@@ -118,29 +147,69 @@ const renderCell = (cell: Value): RenderedCell => {
     return { content: `[${cell.type}]` }
 }
 
-export const TableViewer = ({ value }: ViewerProps<TableValue>) => {
+export const TableViewer = ({
+    value,
+
+    maxHeight,
+    suggestQuery,
+}: ViewerProps<TableValue>) => {
     const columnsOptic = value.prop("columns")
     const rowsOptic = value.prop("data")
 
     const columnNames = columnsOptic.get()
     const rows = rowsOptic.items()
 
+    const [selectedColumns, setSelectedColumns] = useState<string[]>([])
+
     // const summaryText = `${rowsOptic.get().length} rows × ${columnNames.length} columns`
 
     return (
-        <div class={scrollAreaClass}>
+        <div class={scrollAreaClass} style={{ maxHeight }}>
             <table class={tableClass}>
                 <thead>
                     <tr>
+                        <th></th>
                         {columnNames.map(column => (
-                            <th key={column}>{column}</th>
+                            <th
+                                key={column}
+                                classList={selectedColumns.includes(column) ? "selected" : ""}
+                                onClick={e => {
+                                    if (e.shiftKey) {
+                                        setSelectedColumns(selectedColumns => {
+                                            const newSelectedColumns = selectedColumns.includes(column)
+                                                ? selectedColumns.filter(col => col !== column)
+                                                : columnNames.filter(
+                                                      col => selectedColumns.includes(col) || col === column
+                                                  )
+
+                                            suggestQuery?.(entryId => {
+                                                if (newSelectedColumns.length === 0) {
+                                                    return ""
+                                                }
+
+                                                return `${entryId}.columns(${newSelectedColumns
+                                                    .map(col => `"${col}"`)
+                                                    .join(", ")})`
+                                            })
+
+                                            return newSelectedColumns
+                                        })
+                                    }
+                                }}
+                            >
+                                {column}
+                            </th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
-                    {arrayRepeat(
-                        rows.map(row => (
+                    {
+                        // arrayRepeat(
+                        rows.map((row, rowIndex) => (
                             <tr>
+                                <td data-align="right" data-kind="identifier">
+                                    {rowIndex + 1}
+                                </td>
                                 {row.items().map((cell, columnIndex) => {
                                     const { content, align, kind } = renderCell(cell.get())
                                     const columnKey = columnNames[columnIndex] ?? `${columnIndex}`
@@ -157,9 +226,11 @@ export const TableViewer = ({ value }: ViewerProps<TableValue>) => {
                                     )
                                 })}
                             </tr>
-                        )),
-                        10
-                    )}
+                        ))
+                        // ,
+                        //     10
+                        // )
+                    }
                 </tbody>
             </table>
         </div>

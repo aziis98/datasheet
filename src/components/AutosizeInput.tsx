@@ -1,13 +1,16 @@
 import type { ComponentProps } from "preact"
 import { css } from "preact-css-extract/comptime"
-import { forwardRef } from "preact/compat"
+import { forwardRef, useRef } from "preact/compat"
 
 export const AutosizeInput = forwardRef<
     HTMLTextAreaElement,
-    { value: string; setValue?: (val: string) => void } & ComponentProps<"textarea">
+    ComponentProps<"textarea"> & { value: string; setValue?: (val: string) => void }
 >(({ value, setValue, ...textareaProps }, ref) => {
-    const updateScrollHeight = (el: HTMLTextAreaElement | null) => {
-        if (!el) return
+    const inputRef = useRef<HTMLTextAreaElement>(null)
+
+    const updateScrollHeight = () => {
+        if (!inputRef.current) return
+        const el = inputRef.current
 
         // force recalculation with zero height
         el.style.height = "0px"
@@ -23,7 +26,8 @@ export const AutosizeInput = forwardRef<
     return (
         <textarea
             ref={el => {
-                updateScrollHeight(el)
+                inputRef.current = el
+                updateScrollHeight()
 
                 if (typeof ref === "function") {
                     ref(el)
@@ -32,6 +36,7 @@ export const AutosizeInput = forwardRef<
                 }
             }}
             class={css`
+                box-sizing: content-box;
                 resize: vertical;
 
                 &:focus {
@@ -40,7 +45,7 @@ export const AutosizeInput = forwardRef<
             `}
             value={value}
             onInput={e => {
-                updateScrollHeight(e.currentTarget)
+                updateScrollHeight()
                 setValue?.(e.currentTarget.value)
             }}
             {...textareaProps}
