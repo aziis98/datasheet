@@ -210,9 +210,9 @@ const MainContent = ({
                                         margin-bottom: -0.25rem;
 
                                         font-size: 14px;
-                                        font-weight: 500;
+                                        font-weight: 600;
 
-                                        color: var(--text);
+                                        color: #555;
                                         background: var(--bg-header);
 
                                         z-index: 1;

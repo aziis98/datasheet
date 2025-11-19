@@ -40,7 +40,7 @@ const scrollAreaClass = css`
 const tableClass = css`
     width: 100%;
     border-collapse: collapse;
-    font-size: 16px;
+    font-size: 15px;
 
     thead {
         position: sticky;
@@ -66,6 +66,7 @@ const tableClass = css`
         &.selected {
             --border: hsl(210 50% 80%);
             background: hsl(210 50% 90%);
+            color: hsl(210 60% 30%);
         }
     }
 
@@ -81,7 +82,9 @@ const tableClass = css`
 
         &:first-child {
             width: 0;
-            font-size: 13px;
+            font-family: "JetBrains Mono Variable", monospace;
+            font-size: 11px;
+            vertical-align: middle;
         }
     }
 
