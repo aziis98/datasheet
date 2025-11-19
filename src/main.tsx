@@ -274,7 +274,7 @@ type Entry = {
 }
 
 const App = () => {
-    const [bodyAtTop, setBodyAtTop] = useState(true)
+    // const [bodyAtTop, setBodyAtTop] = useState(true)
 
     const [query, setQuery] = useState(
         ""
@@ -371,7 +371,7 @@ const App = () => {
                 display: grid;
                 align-items: start;
                 grid-template-columns: auto 1fr;
-                gap: 0 1rem;
+                gap: 0.5rem 1rem;
 
                 /* width: 100%; */
                 /* max-width: 1200px; */
@@ -414,13 +414,13 @@ const App = () => {
                         position: sticky;
                         top: 0;
 
-                        padding: 1rem;
+                        padding: 1rem 1rem 0.5rem 1rem;
                         margin: 0 -1rem;
 
                         z-index: 3;
                         background: var(--bg-main);
 
-                        &::after {
+                        /* &::after {
                             content: "";
                             position: absolute;
                             left: 0;
@@ -431,15 +431,15 @@ const App = () => {
                             background: linear-gradient(to bottom, var(--bg-main) 0%, #fff0 100%);
 
                             transition: opacity 250ms ease-in-out;
-                        }
+                        } */
                     `,
-                    bodyAtTop &&
-                        css`
-                            &::after {
-                                opacity: 0;
-                                transition: opacity 64ms ease-in-out;
-                            }
-                        `,
+                    // bodyAtTop &&
+                    //     css`
+                    //         &::after {
+                    //             opacity: 0;
+                    //             transition: opacity 64ms ease-in-out;
+                    //         }
+                    //     `,
                 ]}
                 ref={(el: HTMLDivElement | null) => {
                     queryContainerRef.current = el
