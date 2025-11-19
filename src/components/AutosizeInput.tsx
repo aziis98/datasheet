@@ -2,6 +2,9 @@ import type { ComponentProps } from "preact"
 import { css } from "preact-css-extract/comptime"
 import { forwardRef, useRef } from "preact/compat"
 
+/**
+ * A textarea input that automatically resizes vertically to fit its content.
+ */
 export const AutosizeInput = forwardRef<
     HTMLTextAreaElement,
     ComponentProps<"textarea"> & { value: string; setValue?: (val: string) => void }
@@ -38,10 +41,7 @@ export const AutosizeInput = forwardRef<
             class={css`
                 box-sizing: content-box;
                 resize: vertical;
-
-                &:focus {
-                    outline: none;
-                }
+                outline: none;
             `}
             value={value}
             onInput={e => {

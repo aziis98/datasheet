@@ -13,24 +13,19 @@ export const arrayRepeat = <T>(items: T[], count: number): T[] => {
 }
 
 export const tryEvaluate = (code: string, context: Record<string, any> = {}): any | string => {
-    // try {
-    // const func = new Function(...Object.keys(context ?? {}), `"use strict"; return (${code})`)
-    // return func(...Object.values(context ?? {}))
-    // } catch (e) {
-    //     return `Error: ${(e as Error).message}`
-    // }
-
     const contextKeys = Object.keys(context ?? {})
     const contextValues = Object.values(context ?? {})
 
     try {
-        console.log("Evaluating code:", code, "with context:", context)
-
         // Create a new function with the context keys as parameters
-        const func = new Function(...contextKeys, `"use strict"; return (${code})`)
+        const func = new Function(...contextKeys, `return (${code})`)
 
         // Call the function with the context values
-        return func(...contextValues)
+        const result = func(...contextValues)
+
+        console.log("Evaluating", code, "with context:", context, "\n=>", result)
+
+        return result
     } catch (e) {
         return `Error: ${(e as Error).message}`
     }

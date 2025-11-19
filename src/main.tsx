@@ -35,6 +35,7 @@ const QueryBar = forwardRef<
             placeholder="Enter a new query..."
             value={query}
             setValue={setQuery}
+            // disable autocorrect features for code input
             spellcheck={false}
             autocomplete="off"
             autocorrect="off"
@@ -43,64 +44,54 @@ const QueryBar = forwardRef<
     )
 })
 
+const outlineStyle = css`
+    min-width: 13rem;
+    padding: 0.5rem;
+
+    display: grid;
+    gap: 0.5rem;
+    grid-auto-flow: row;
+
+    position: sticky;
+
+    z-index: 3;
+
+    transition: top 64ms ease-out;
+`
+
 const Outline = ({ topOffset, entries }: { topOffset?: number; entries: Optic<Entry[]> }) => {
     return (
-        <div
-            classList={[
-                "card",
-                css`
-                    min-width: 13rem;
-                    padding-left: 0.5rem;
-
-                    display: grid;
-                    gap: 0.5rem;
-                    grid-auto-flow: row;
-
-                    position: sticky;
-
-                    z-index: 3;
-
-                    transition: top 64ms ease-out;
-                `,
-            ]}
-            style={{ top: `${topOffset}px` }}
-        >
+        <div classList={["card", outlineStyle]} style={{ top: `${topOffset}px` }}>
             <div
-                class={css`
-                    display: grid;
-                    gap: 0.25rem;
-                    grid-auto-flow: column;
-                    justify-content: start;
-                    align-items: center;
-
-                    gap: 0.5rem;
-                    font-weight: 600;
-                `}
+                classList={[
+                    "grid-h",
+                    css`
+                        gap: 0.5rem;
+                        font-weight: 600;
+                    `,
+                ]}
             >
                 <Icon icon="ph:tree-view" />
                 <div>Outline</div>
             </div>
-            <div
-                class={css`
-                    display: grid;
-                    grid-auto-flow: row;
-                    gap: 0.25rem;
-                `}
-            >
+            <div class="grid-v">
                 {entries
                     .items()
                     .reverse()
                     .map(entry => {
                         const { id, content: value } = entry.get()
+
+                        const scrollToEntry = () => {
+                            const el = document.querySelector(`[data-entry-id="${id}"]`)
+                            el?.scrollIntoView({ behavior: "smooth", block: "center" })
+                        }
+
                         return (
                             <div
                                 title={id}
                                 classList={[
-                                    "grid-h",
+                                    "flex-h",
                                     css`
-                                        grid-template-columns: auto 1fr auto;
-                                        gap: 0.35rem;
-
                                         padding: 0.25rem 0.5rem 0.25rem 0.5rem;
                                         border-radius: 0.25rem;
                                         cursor: pointer;
@@ -110,29 +101,21 @@ const Outline = ({ topOffset, entries }: { topOffset?: number; entries: Optic<En
                                         }
                                     `,
                                 ]}
-                                onClick={() => {
-                                    const el = document.querySelector(`[data-entry-id="${id}"]`)
-                                    if (el) {
-                                        el.scrollIntoView({ behavior: "smooth", block: "center" })
-                                    }
-                                }}
+                                onClick={scrollToEntry}
                             >
                                 <Icon icon={ViewerIcons[value.type]} />
                                 <div
                                     classList={[
                                         "text-small",
+                                        "text-ellipsis",
                                         css`
-                                            /* Truncation */
-                                            overflow: hidden;
-                                            text-overflow: ellipsis;
-                                            white-space: nowrap;
-
                                             max-width: 13rem;
                                         `,
                                     ]}
                                 >
                                     {id}
                                 </div>
+                                <div class="fill"></div>
                                 <div class="text-small text-dimmed">{value.type}</div>
                             </div>
                         )
@@ -171,10 +154,13 @@ const MainContent = ({
                                 data-entry-id={id}
                                 classList={[
                                     "card",
+                                    "grid-fill",
                                     css`
-                                        padding: 0;
-                                        display: grid;
-                                        overflow: clip;
+                                        border-radius: 0.25rem;
+
+                                        &:hover {
+                                            box-shadow: 0 0 0 0.25rem hsl(from var(--bg-hover) h s l / 0.1);
+                                        }
                                     `,
                                 ]}
                             >
@@ -193,8 +179,8 @@ const MainContent = ({
                                 border-radius: 0.25rem;
 
                                 &:hover {
-                                    background: hsl(220 14% 89%);
-                                    box-shadow: 0 0 0 0.25rem hsl(220 14% 89%);
+                                    background: hsl(from var(--bg-hover) h s l / 0.1);
+                                    box-shadow: 0 0 0 0.25rem hsl(from var(--bg-hover) h s l / 0.1);
                                 }
                             `}
                         >
@@ -202,6 +188,8 @@ const MainContent = ({
                                 classList={[
                                     "card",
                                     css`
+                                        z-index: 1;
+
                                         border-bottom: none;
                                         border-bottom-left-radius: 0;
                                         border-bottom-right-radius: 0;
@@ -214,9 +202,6 @@ const MainContent = ({
 
                                         color: #555;
                                         background: var(--bg-header);
-
-                                        z-index: 1;
-                                        display: grid;
                                     `,
                                 ]}
                             >
@@ -225,17 +210,10 @@ const MainContent = ({
                             <div
                                 classList={[
                                     "card",
+                                    "grid-v",
                                     css`
-                                        justify-self: stretch;
-
-                                        display: grid;
-                                        grid-auto-flow: row;
-                                        grid-auto-rows: auto;
-
-                                        padding: 0;
-                                        overflow: clip;
-
                                         z-index: 2;
+                                        justify-self: stretch;
                                     `,
                                 ]}
                             >
@@ -334,18 +312,16 @@ const App = () => {
 
                 const columns = result.meta.fields ?? []
 
-                const tableValue: Value = {
-                    type: "table",
-                    columns: columns,
-                    // @ts-ignore
-                    data: data.map(row => columns.map(col => ({ type: "text", content: row[col] || "" }))),
-                }
-
                 store.prop("entries").arrayAppend({
                     id: file.name
                         .replace(/\.[^/.]+$/, "") // remove extension
                         .replace(/[^\w\d_]+/g, "_"), // sanitize to valid identifier
-                    content: tableValue,
+                    content: {
+                        type: "table",
+                        columns: columns,
+                        // @ts-ignore
+                        data: data.map(row => columns.map(col => ({ type: "text", content: row[col] || "" }))),
+                    },
                 })
             }
             reader.readAsText(file)
@@ -450,7 +426,10 @@ const App = () => {
                     classList={[
                         "card",
                         css`
+                            overflow: visible;
+
                             box-sizing: content-box;
+                            padding: 0.5rem;
 
                             font-family: "JetBrains Mono Variable", monospace;
                             font-size: 14px;
@@ -515,23 +494,21 @@ const App = () => {
                             grid-column: 2 / 3;
                         `}
                     >
-                        {PreviewViewer && resultPreviewValue ? (
-                            <div
-                                classList={[
-                                    "card",
-                                    css`
-                                        overflow: clip;
-                                        padding: 0;
-                                        zoom: 0.8;
-                                        border-radius: 0.5rem;
-                                    `,
-                                ]}
-                            >
+                        <div
+                            classList={[
+                                "card",
+                                css`
+                                    zoom: 0.8;
+                                    border-radius: 0.5rem;
+                                `,
+                            ]}
+                        >
+                            {PreviewViewer && resultPreviewValue ? (
                                 <PreviewViewer value={Optic.ofFrozen<Value>(resultPreviewValue)} maxHeight="30vh" />
-                            </div>
-                        ) : (
-                            <span class="text-dimmed">No preview available</span>
-                        )}
+                            ) : (
+                                <code>{JSON.stringify(resultPreview)}</code>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

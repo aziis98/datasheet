@@ -82,9 +82,6 @@ export const Editable = ({ oValue, inputClass }: { oValue: Optic<string>; inputC
             }}
             class={css`
                 cursor: text;
-                &:hover {
-                    background: var(--bg-hover);
-                }
             `}
         >
             {oValue.get()}

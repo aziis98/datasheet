@@ -11,7 +11,7 @@
     --bg-header: light-dark(hsl(220, 14%, 96%), #444);
     --bg-label: light-dark(hsl(220, 14%, 92%), #111);
 
-    --bg-hover: light-dark(hsl(210, 20%, 96%), #393939);
+    --bg-hover: light-dark(hsl(220 14% 50% / 0.05), #393939);
 
     --border: light-dark(#d1d5db, #222);
     --border-divider: light-dark(#e5e7eb, #222);
@@ -36,7 +36,7 @@
         gap: 0.5rem;
         align-items: center;
 
-        background: linear-gradient(to bottom, hsl(210 14% 90%), hsl(210 14% 85%));
+        background: linear-gradient(to bottom, hsl(220 14% 93%), hsl(220 14% 90%));
         color: hsl(210 70% 10%);
         padding: 0.25rem 0.5rem;
         border-radius: 0.25rem;
@@ -53,6 +53,10 @@
 
         &:hover {
             filter: brightness(1.025);
+        }
+
+        &:active {
+            filter: brightness(0.975);
         }
 
         &.icon {
@@ -75,7 +79,7 @@
     h5,
     h6 {
         font-family: "Source Sans Pro", sans-serif;
-        font-weight: 300;
+        font-weight: 600;
         margin: 0;
     }
 
@@ -123,7 +127,7 @@
         border: 1px solid light-dark(#d1d5db, #444);
         border-radius: 0.25rem;
         box-shadow: var(--shadow);
-        padding: 0.5rem;
+        overflow: clip;
     }
 
     @extracted-css;
@@ -141,6 +145,11 @@
     .grid-v {
         display: grid;
         grid-auto-flow: row;
+    }
+
+    .grid-fill {
+        place-self: stretch;
+        display: grid;
     }
 
     .flex-h {
@@ -161,5 +170,11 @@
 
     .text-dimmed {
         color: light-dark(#888, #888);
+    }
+
+    .text-ellipsis {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
