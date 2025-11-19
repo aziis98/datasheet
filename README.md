@@ -74,8 +74,6 @@ Key files and directories:
 
 -   `src/components/*` — Reusable UI components such as `AutosizeInput` and an Icon wrapper.
 
--   `docs/design.json` — Design tokens and component layout system used for consistent UI.
-
 ## Usage
 
 -   Query bar
@@ -105,7 +103,3 @@ Some next-step ideas and improvements:
 -   Provide a safer query sandbox for running queries instead of `new Function`.
 
 -   Add unit and integration tests.
-
--   Add a `README` for the `docs/design.json` tokens and CSS token definitions.
-
--   Add accessibility improvements for keyboard navigation and screen readers.
