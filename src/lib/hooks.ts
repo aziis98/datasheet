@@ -6,39 +6,79 @@ export type UpdaterFn<T> = (updater: (current: T) => T) => void
 
 export class Optic<T> {
     #value: T
-    #updater: UpdaterFn<T>
+    #updater?: UpdaterFn<T>
 
-    static of<T>(value: T, updater: UpdaterFn<T>) {
+    static of<T>(value: T, updater?: UpdaterFn<T>) {
         return new Optic<T>(value, updater)
     }
 
-    static ofFrozen<T>(value: T) {
-        return new Optic<T>(value, () => {
-            throw new Error("Cannot update a frozen Optic")
-        })
-    }
-
-    constructor(value: T, updater: UpdaterFn<T>) {
+    constructor(value: T, updater?: UpdaterFn<T>) {
         this.#value = value
         this.#updater = updater
     }
 
-    update(updater: (current: T) => T) {
+    get isReadonly(): boolean {
+        return this.#updater === undefined
+    }
+
+    get isUpdatable(): boolean {
+        return this.#updater !== undefined
+    }
+
+    update = (updater: (current: T) => T) => {
+        if (!this.#updater) {
+            throw new Error("Cannot update a readonly Optic")
+        }
+
         this.#updater(updater)
     }
 
-    get(): T {
+    get = (): T => {
         return this.#value
     }
 
-    set(value: T) {
-        this.#updater(() => value)
+    set = (value: T) => {
+        this.update(() => value)
+    }
+
+    map<U>(mapTo: (value: T) => U, mapBack: (value: U) => T): Optic<U> {
+        return Optic.of<U>(
+            mapTo(this.#value),
+            this.isUpdatable
+                ? updater => {
+                      this.update(current => mapBack(updater(mapTo(current))))
+                  }
+                : undefined
+        )
+    }
+
+    trySubtype<U extends T>(check: (value: T) => value is U): Optic<U> | null {
+        if (!check(this.#value)) {
+            return null
+        }
+
+        return Optic.of(
+            this.#value,
+            this.isUpdatable
+                ? updater => {
+                      this.update(current => {
+                          const subValue = current as U
+                          return updater(subValue)
+                      })
+                  }
+                : undefined
+        )
     }
 
     lens<K>(lens: Lens<T, K>): Optic<K> {
-        return new Optic<K>(lens.get(this.#value), updater => {
-            this.#updater(current => lens.set(current, updater(lens.get(current))))
-        })
+        return Optic.of<K>(
+            lens.get(this.#value),
+            this.isUpdatable
+                ? updater => {
+                      this.update(current => lens.set(current, updater(lens.get(current))))
+                  }
+                : undefined
+        )
     }
 
     prop<K extends keyof T>(key: K): Optic<T[K]> {
@@ -64,7 +104,7 @@ export class Optic<T> {
     }
 
     arrayAppend(...items: T extends Array<infer U> ? U[] : never[]) {
-        this.#updater(current => {
+        this.update(current => {
             if (Array.isArray(current)) {
                 return [...current, ...items] as T
             }
@@ -89,20 +129,25 @@ export class Optic<T> {
             const key = stringKey as keyof T
 
             return [
-                new Optic<keyof T>(key, updater => {
-                    this.#updater(current => {
-                        const value = current[key]
-                        const newKey = updater(key)
-                        if (newKey === key) {
-                            return current
-                        }
-                        const { [key]: _, ...rest } = current as any
-                        return {
-                            ...rest,
-                            [newKey]: value,
-                        } as T
-                    })
-                }),
+                Optic.of<keyof T>(
+                    key,
+                    this.isUpdatable
+                        ? updater => {
+                              this.update(current => {
+                                  const value = current[key]
+                                  const newKey = updater(key)
+                                  if (newKey === key) {
+                                      return current
+                                  }
+                                  const { [key]: _, ...rest } = current as any
+                                  return {
+                                      ...rest,
+                                      [newKey]: value,
+                                  } as T
+                              })
+                          }
+                        : undefined
+                ),
                 this.prop(key),
             ]
         })
@@ -113,9 +158,9 @@ export class Optic<T> {
             this.#value,
             (value: T | ((current: T) => T)) => {
                 if (typeof value === "function") {
-                    this.#updater(value as (current: T) => T)
+                    this.update(value as (current: T) => T)
                 } else {
-                    this.#updater(() => value as T)
+                    this.update(() => value as T)
                 }
             },
         ]
@@ -125,7 +170,7 @@ export class Optic<T> {
 export const useOpticState = <T>(initialValue: T) => {
     const [value, setValue] = useState<T>(initialValue)
 
-    return new Optic<T>(value, updater => {
+    return Optic.of<T>(value, updater => {
         setValue(current => updater(current))
     })
 }
@@ -160,10 +205,10 @@ export const useClickOutside = (ref: RefObject<HTMLElement>, handler: (event: Mo
             handler(event)
         }
 
-        document.addEventListener("mousedown", listener)
+        document.addEventListener("pointerdown", listener)
 
         return () => {
-            document.removeEventListener("mousedown", listener)
+            document.removeEventListener("pointerdown", listener)
         }
     }, [ref, handler])
 }
@@ -211,4 +256,32 @@ export const useTimer = (interval: number, callback: () => void) => {
             return () => clearInterval(id)
         }
     }, [interval])
+}
+
+export const useKeyPress = (e: (event: KeyboardEvent) => boolean) => {
+    const [pressed, setPressed] = useState(false)
+
+    useEffect(() => {
+        const downHandler = (event: KeyboardEvent) => {
+            if (e(event)) {
+                setPressed(true)
+            }
+        }
+
+        const upHandler = (event: KeyboardEvent) => {
+            if (e(event)) {
+                setPressed(false)
+            }
+        }
+
+        window.addEventListener("keydown", downHandler)
+        window.addEventListener("keyup", upHandler)
+
+        return () => {
+            window.removeEventListener("keydown", downHandler)
+            window.removeEventListener("keyup", upHandler)
+        }
+    }, [e])
+
+    return pressed
 }

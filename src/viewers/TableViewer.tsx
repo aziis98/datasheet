@@ -1,6 +1,10 @@
+import { AutosizeInput } from "@/components/AutosizeInput"
+import { Optic, useClickOutside } from "@/lib/hooks"
+import type { RefObject } from "preact"
 import { css } from "preact-css-extract/comptime"
-import { useState } from "preact/hooks"
-import type { TableValue, Value, ViewerProps } from "./types"
+import { createPortal } from "preact/compat"
+import { useRef, useState } from "preact/hooks"
+import type { TableValue, TextValue, Value, ViewerProps } from "./types"
 
 type RenderedCell = {
     content: string
@@ -93,12 +97,15 @@ const tableClass = css`
         border-right: none;
     }
 
-    tbody tr:last-child td {
-        border-bottom: none;
-    }
+    tbody {
+        tr:last-child td {
+            border-bottom: none;
+        }
 
-    tbody tr:hover td {
-        background: var(--bg-hover);
+        tr:hover,
+        td:hover {
+            background: var(--bg-hover);
+        }
     }
 
     td[data-align="right"] {
@@ -151,49 +158,49 @@ const renderCell = (cell: Value): RenderedCell => {
 }
 
 export const TableViewer = ({
-    value,
+    oValue,
 
     maxHeight,
     suggestQuery,
 }: ViewerProps<TableValue>) => {
-    const columnsOptic = value.prop("columns")
-    const rowsOptic = value.prop("data")
+    const { columns } = oValue.get()
 
-    const columnNames = columnsOptic.get()
-    const rows = rowsOptic.items()
+    const oData = oValue.prop("data")
 
     const [selectedColumns, setSelectedColumns] = useState<string[]>([])
+
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    useClickOutside(containerRef, () => {
+        setSelectedColumns([])
+    })
 
     // const summaryText = `${rowsOptic.get().length} rows × ${columnNames.length} columns`
 
     return (
-        <div class={scrollAreaClass} style={{ maxHeight }}>
+        <div ref={containerRef} class={scrollAreaClass} style={{ maxHeight }}>
             <table class={tableClass}>
                 <thead>
                     <tr>
                         <th></th>
-                        {columnNames.map(column => (
+                        {columns.map(column => (
                             <th
                                 key={column}
                                 classList={selectedColumns.includes(column) ? "selected" : ""}
-                                onClick={e => {
+                                onPointerDown={e => {
                                     if (e.shiftKey) {
                                         setSelectedColumns(selectedColumns => {
                                             const newSelectedColumns = selectedColumns.includes(column)
                                                 ? selectedColumns.filter(col => col !== column)
-                                                : columnNames.filter(
-                                                      col => selectedColumns.includes(col) || col === column
-                                                  )
+                                                : columns.filter(col => selectedColumns.includes(col) || col === column)
 
-                                            suggestQuery?.(entryId => {
-                                                if (newSelectedColumns.length === 0) {
-                                                    return ""
-                                                }
-
-                                                return `${entryId}.columns(${newSelectedColumns
-                                                    .map(col => `"${col}"`)
-                                                    .join(", ")})`
-                                            })
+                                            suggestQuery?.(
+                                                newSelectedColumns.length === 0
+                                                    ? ""
+                                                    : `.columns(${newSelectedColumns
+                                                          .map(col => `"${col}"`)
+                                                          .join(", ")})`
+                                            )
 
                                             return newSelectedColumns
                                         })
@@ -208,14 +215,19 @@ export const TableViewer = ({
                 <tbody>
                     {
                         // arrayRepeat(
-                        rows.map((row, rowIndex) => (
+                        oData.items().map((oRow, rowIndex) => (
                             <tr>
                                 <td data-align="right" data-kind="identifier">
                                     {rowIndex + 1}
                                 </td>
-                                {row.items().map((cell, columnIndex) => {
+                                {oRow.items().map((cell, columnIndex) => {
                                     const { content, align, kind } = renderCell(cell.get())
-                                    const columnKey = columnNames[columnIndex] ?? `${columnIndex}`
+                                    const columnKey = columns[columnIndex] ?? `${columnIndex}`
+
+                                    const textValue = cell.trySubtype(cell => cell.type === "text")
+                                    if (textValue) {
+                                        return <EditableTableTextCell oValue={textValue} />
+                                    }
 
                                     return (
                                         <td
@@ -237,5 +249,138 @@ export const TableViewer = ({
                 </tbody>
             </table>
         </div>
+    )
+}
+
+const EditableTableTextCell = ({ oValue }: { oValue: Optic<TextValue> }) => {
+    const containerRef = useRef<HTMLTableCellElement>(null)
+    const { align, kind } = renderCell(oValue.get())
+
+    return (
+        <td ref={containerRef} data-align={align} data-kind={kind}>
+            <EditableTextCell containerRef={containerRef} oValue={oValue.prop("content")} />
+        </td>
+    )
+}
+
+const EditableTextCell = ({
+    containerRef,
+    oValue,
+}: {
+    containerRef: RefObject<HTMLElement>
+    oValue: Optic<string>
+}) => {
+    const editingRef = useRef<HTMLDivElement>(null)
+
+    const [containerRect, setContainerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(
+        null
+    )
+
+    const [editing, setEditing] = useState<false | string>(false)
+
+    const handleAccept = () => {
+        oValue.set(editing as string)
+        setEditing(false)
+    }
+
+    const handleCancel = () => {
+        setEditing(false)
+    }
+
+    useClickOutside(editingRef, () => {
+        handleAccept()
+    })
+
+    return (
+        <>
+            <span
+                onClick={() => {
+                    console.log(oValue)
+                    if (oValue.isReadonly) return
+
+                    const rect = containerRef.current?.getBoundingClientRect()
+                    if (rect) {
+                        setContainerRect({
+                            x: rect.left,
+                            y: rect.top,
+                            width: rect.width,
+                            height: rect.height,
+                        })
+                    }
+                    setEditing(oValue.get())
+                }}
+                classList={[
+                    css`
+                        cursor: text;
+                    `,
+                    editing !== false &&
+                        css`
+                            opacity: 0.5;
+
+                            &::after {
+                                content: "...";
+                                display: inline-block;
+
+                                width: 0;
+                            }
+                        `,
+                ]}
+            >
+                {oValue.get()}
+            </span>
+
+            {editing !== false &&
+                createPortal(
+                    <div
+                        ref={editingRef}
+                        class={css`
+                            position: fixed;
+                            z-index: 1000;
+
+                            display: grid;
+                        `}
+                        style={{
+                            left: containerRect ? `${containerRect.x}px` : "0px",
+                            top: containerRect ? `${containerRect.y}px` : "0px",
+                            width: containerRect ? `${containerRect.width}px` : "auto",
+                            height: containerRect ? `${containerRect.height}px` : "auto",
+                        }}
+                    >
+                        <AutosizeInput
+                            autoFocus
+                            classList={[
+                                "card",
+                                css`
+                                    /* background: hsl(90, 75%, 80%); */
+                                    box-sizing: content-box;
+
+                                    font-family: "JetBrains Mono Variable", monospace;
+                                    font-variant-numeric: tabular-nums;
+                                    font-size: 13px;
+
+                                    padding: 0.45rem 0.25rem;
+                                `,
+                            ]}
+                            oValue={Optic.of(editing, updater =>
+                                setEditing(previous => updater(previous === false ? "" : previous))
+                            )}
+                            onKeyDown={e => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    handleAccept()
+                                }
+                                if (e.key === "Escape") {
+                                    handleCancel()
+                                }
+                            }}
+                            // disable autocomplete etc
+                            spellcheck={false}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                        />
+                    </div>,
+                    document.getElementById("overlay")!
+                )}
+        </>
     )
 }

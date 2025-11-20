@@ -2,9 +2,7 @@ import { AutosizeInput } from "@/components/AutosizeInput"
 import { css } from "preact-css-extract/comptime"
 import type { TextValue, ViewerProps } from "./types"
 
-export const TextViewer = ({ value }: ViewerProps<TextValue>) => {
-    const [content, setContent] = value.prop("content").asHook()
-
+export const TextViewer = ({ oValue }: ViewerProps<TextValue>) => {
     return (
         <AutosizeInput
             classList={css`
@@ -14,8 +12,7 @@ export const TextViewer = ({ value }: ViewerProps<TextValue>) => {
                 font-size: 16px;
                 line-height: 1.5;
             `}
-            value={content}
-            setValue={setContent}
+            oValue={oValue.prop("content")}
         />
     )
 }

@@ -4,19 +4,22 @@
     color-scheme: light dark;
 
     --text: light-dark(#333, #ddd);
+    --text-muted: light-dark(#777, #999);
 
     --bg-main: light-dark(hsl(220, 14%, 92%), #222);
 
     --bg: light-dark(hsl(210, 20%, 98%), #333);
     --bg-header: light-dark(hsl(220, 14%, 96%), #444);
-    --bg-label: light-dark(hsl(220, 14%, 92%), #111);
-
+    --bg-label: light-dark(hsl(220, 14%, 92%), #333);
     --bg-hover: light-dark(hsl(220 14% 50% / 0.05), #393939);
+
+    --bg-button: light-dark(hsl(220 14% 90%), #333);
+    --button-fg: hsl(from var(--bg-button) h s calc(100 - l));
 
     --border: light-dark(#d1d5db, #222);
     --border-divider: light-dark(#e5e7eb, #222);
 
-    --shadow: 0 0.125rem 0.35rem light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.5));
+    --shadow: 0 0.125rem 0.35rem light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.25));
 }
 
 @layer base {
@@ -36,13 +39,13 @@
         gap: 0.5rem;
         align-items: center;
 
-        background: linear-gradient(to bottom, hsl(220 14% 93%), hsl(220 14% 90%));
-        color: hsl(210 70% 10%);
+        background: linear-gradient(to bottom, hsl(from var(--bg-button) h s calc(l + 3)), var(--bg-button));
+        color: var(--button-fg);
         padding: 0.25rem 0.5rem;
         border-radius: 0.25rem;
         font-weight: 600;
         box-shadow: var(--shadow);
-        border: 1px solid hsl(210 14% 80%);
+        border: 1px solid hsl(from var(--bg-button) h s calc(l - 10));
 
         font-family: "Source Sans Pro", sans-serif;
         font-size: 14px;
@@ -109,6 +112,10 @@
         padding: 1rem 1rem 25vh 1rem;
 
         user-select: none;
+
+        #app {
+            display: contents;
+        }
     }
 
     input,

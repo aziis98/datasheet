@@ -13,6 +13,8 @@ export const arrayRepeat = <T>(items: T[], count: number): T[] => {
 }
 
 export const tryEvaluate = (code: string, context: Record<string, any> = {}): any | string => {
+    if (!code.trim()) return undefined
+
     const contextKeys = Object.keys(context ?? {})
     const contextValues = Object.values(context ?? {})
 
@@ -27,6 +29,7 @@ export const tryEvaluate = (code: string, context: Record<string, any> = {}): an
 
         return result
     } catch (e) {
+        console.log("Error evaluating code:", code)
         return `Error: ${(e as Error).message}`
     }
 }

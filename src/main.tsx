@@ -2,7 +2,7 @@ import { Icon } from "@/components/Icon"
 import Papa from "papaparse"
 import { render, type ComponentProps } from "preact"
 import { css } from "preact-css-extract/comptime"
-import { useEffect, useRef, useState } from "preact/hooks"
+import { useEffect, useMemo, useRef, useState } from "preact/hooks"
 
 import "@fontsource-variable/jetbrains-mono/index.css"
 import "@fontsource/source-sans-pro/index.css"
@@ -15,9 +15,10 @@ import { forwardRef } from "preact/compat"
 import { AutosizeInput } from "./components/AutosizeInput"
 import { Editable } from "./components/Editable"
 import { EXAMPLE_DATASET } from "./example-dataset"
-import { Optic, useLocalStorage, useOpticState, useTimer } from "./lib/hooks"
+import { Optic, useKeyPress, useLocalStorage, useOpticState, useTimer } from "./lib/hooks"
 import { tryEvaluate } from "./lib/utils"
 import { ViewerIcons, Viewers } from "./viewers"
+import { TextViewer } from "./viewers/TextViewer"
 import { ValueWrapper, type Value } from "./viewers/types"
 setupPreactClasslist()
 
@@ -31,10 +32,10 @@ const QueryBar = forwardRef<
     return (
         <AutosizeInput
             {...rest}
+            autoFocus={false}
             ref={ref}
             placeholder="Enter a new query..."
-            value={query}
-            setValue={setQuery}
+            oValue={Optic.of(query, u => setQuery(u(query)))}
             // disable autocorrect features for code input
             spellcheck={false}
             autocomplete="off"
@@ -61,7 +62,7 @@ const outlineStyle = css`
 
 const Outline = ({ topOffset, entries }: { topOffset?: number; entries: Optic<Entry[]> }) => {
     return (
-        <div classList={["card", outlineStyle]} style={{ top: `${topOffset}px` }}>
+        <div classList={["card", outlineStyle]} style={{ top: `calc(0.5rem + ${topOffset}px)` }}>
             <div
                 classList={[
                     "grid-h",
@@ -127,10 +128,10 @@ const Outline = ({ topOffset, entries }: { topOffset?: number; entries: Optic<En
 
 const MainContent = ({
     entries,
-    suggestQueryFor,
+    suggestQuery,
 }: {
     entries: Optic<Entry[]>
-    suggestQueryFor: (entryId: string) => (completion: (entryId: string) => string) => void
+    suggestQuery: (completion: string) => void
 }) => {
     return (
         <div
@@ -148,7 +149,9 @@ const MainContent = ({
 
                     const Viewer = Viewers[content.type]
 
-                    if (content.type === "text") {
+                    const textValueOptic = entry.prop("content").trySubtype(v => v.type === "text")
+
+                    if (textValueOptic) {
                         return (
                             <div
                                 data-entry-id={id}
@@ -164,7 +167,7 @@ const MainContent = ({
                                     `,
                                 ]}
                             >
-                                <Viewer value={entry.prop("content")} />
+                                <TextViewer oValue={textValueOptic} />
                             </div>
                         )
                     }
@@ -200,8 +203,8 @@ const MainContent = ({
                                         font-size: 14px;
                                         font-weight: 600;
 
-                                        color: #555;
-                                        background: var(--bg-header);
+                                        color: var(--text-muted);
+                                        background: var(--bg-label);
                                     `,
                                 ]}
                             >
@@ -237,7 +240,12 @@ const MainContent = ({
                                 `}
                             /> */}
 
-                                <Viewer suggestQuery={suggestQueryFor(id)} value={entry.prop("content")} />
+                                <Viewer
+                                    suggestQuery={completion =>
+                                        completion === "" ? suggestQuery("") : suggestQuery(id + completion)
+                                    }
+                                    oValue={entry.prop("content")}
+                                />
                             </div>
                         </div>
                     )
@@ -260,10 +268,7 @@ const App = () => {
         //     [...Array(100).keys()].filter(n => n > 1 && [...Array(Math.sqrt(n) | 0).keys()].slice(1).every(d => n % (d + 1)))
         // `)
     )
-
-    const suggestQueryFor = (entryId: string) => (completion: (entryId: string) => string) => {
-        setQuery(completion(entryId))
-    }
+    const [queryTarget, setQueryTarget] = useState<string>("")
 
     const queryContainerRef = useRef<HTMLElement | null>(null)
     const [queryHeight, setQueryHeight] = useState(0)
@@ -329,14 +334,22 @@ const App = () => {
         input.click()
     }
 
-    const resultPreview = tryEvaluate(query, {
-        ...Object.fromEntries(
-            store
-                .prop("entries")
-                .get()
-                .map(e => [e.id, new ValueWrapper(e.content)])
-        ),
-    })
+    const shiftKeyPressed = useKeyPress(e => e.key === "Shift")
+
+    const resultPreview = useMemo(
+        () =>
+            query.trim().length === 0
+                ? null
+                : tryEvaluate(query, {
+                      ...Object.fromEntries(
+                          store
+                              .prop("entries")
+                              .get()
+                              .map(e => [e.id, new ValueWrapper(e.content)])
+                      ),
+                  }),
+        [shiftKeyPressed || query]
+    )
 
     const resultPreviewValue: Value | null = resultPreview instanceof ValueWrapper ? resultPreview.inner : null
     const PreviewViewer = resultPreviewValue ? Viewers[resultPreviewValue.type] : null
@@ -442,6 +455,7 @@ const App = () => {
                     setQuery={value => {
                         updateQueryHeight()
                         setQuery(value)
+                        setQueryTarget(value)
                     }}
                 />
 
@@ -456,7 +470,7 @@ const App = () => {
 
                             margin: 0 0.5rem;
                             padding: 0.5rem;
-                            gap: 0.25rem;
+                            gap: 0.5rem;
 
                             background: hsl(from var(--bg-main) h calc(s + 15) calc(l + 3));
                             border: 1px solid var(--border);
@@ -474,7 +488,7 @@ const App = () => {
                                 grid-row: 1 / -1;
                             }
                         `,
-                        query.trim().length === 0 &&
+                        !(query.trim().length > 0 && resultPreview !== null) &&
                             css`
                                 pointer-events: none;
                                 transform: translateY(-100%);
@@ -488,7 +502,7 @@ const App = () => {
                     }}
                 >
                     <Icon icon="ph:arrow-bend-down-right" />
-                    <span>Preliminary result for query:</span>
+                    {/* <span>Preliminary result for query:</span> */}
                     <div
                         class={css`
                             grid-column: 2 / 3;
@@ -504,7 +518,11 @@ const App = () => {
                             ]}
                         >
                             {PreviewViewer && resultPreviewValue ? (
-                                <PreviewViewer value={Optic.ofFrozen<Value>(resultPreviewValue)} maxHeight="30vh" />
+                                <PreviewViewer
+                                    suggestQuery={completion => setQuery(queryTarget + completion)}
+                                    oValue={Optic.of<Value>(resultPreviewValue)}
+                                    maxHeight="30vh"
+                                />
                             ) : (
                                 <code>{JSON.stringify(resultPreview)}</code>
                             )}
@@ -514,9 +532,46 @@ const App = () => {
             </div>
 
             <Outline topOffset={queryHeight} entries={store.prop("entries")} />
-            <MainContent entries={store.prop("entries")} suggestQueryFor={suggestQueryFor} />
+            <MainContent
+                entries={store.prop("entries")}
+                suggestQuery={completion => {
+                    setQuery(completion)
+                    setQueryTarget(completion)
+                }}
+            />
+
+            <div
+                class={css`
+                    position: fixed;
+                    bottom: 1rem;
+                    left: 1rem;
+
+                    z-index: 1000;
+                `}
+            >
+                {shiftKeyPressed && (
+                    <div
+                        class={css`
+                            display: grid;
+                            place-items: center;
+
+                            padding: 0.25rem 0.5rem;
+                            border-radius: 0.25rem;
+                            opacity: 0.75;
+
+                            background: #000;
+                            color: #fff;
+
+                            font-family: "JetBrains Mono Variable", monospace;
+                            font-size: 15px;
+                        `}
+                    >
+                        Shift
+                    </div>
+                )}
+            </div>
         </div>
     )
 }
 
-render(<App />, document.body)
+render(<App />, document.getElementById("app")!)

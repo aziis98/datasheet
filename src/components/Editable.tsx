@@ -23,7 +23,18 @@ export const Editable = ({ oValue, inputClass }: { oValue: Optic<string>; inputC
     })
 
     return editing !== false ? (
-        <div class="grid-h" ref={inputContainerRef}>
+        <div
+            class={css`
+                width: 100%;
+
+                display: grid;
+                gap: 0.25rem;
+                grid-template-columns: 1fr auto;
+
+                align-items: center;
+            `}
+            ref={inputContainerRef}
+        >
             <input
                 ref={el => {
                     el?.focus()
@@ -56,6 +67,7 @@ export const Editable = ({ oValue, inputClass }: { oValue: Optic<string>; inputC
                     css`
                         background: hsl(120 20% 90%);
                         aspect-ratio: 1 / 1;
+                        height: 0.75rem;
                         border-radius: 2rem;
                         padding: 3px;
 
