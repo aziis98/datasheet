@@ -69,40 +69,81 @@ export class ValueWrapper<V extends Value> {
             throw new Error("Join columns not found")
         }
 
-        // pick the smaller table to build the lookup map
-        const [smallTable, smallColIndex, largeTable, largeColIndex] =
-            this.inner.data.length <= other.inner.data.length
-                ? [this, thisColIndex, other, otherColIndex]
-                : [other, otherColIndex, this, thisColIndex]
-
-        const lookup = new Map<string, Value[]>()
-
-        for (const row of smallTable.inner.data) {
-            const key = row[smallColIndex].type === "text" ? row[smallColIndex].content : ""
-            lookup.set(key, row)
-        }
-
-        const joinedColumns = [
+        const newColumns = [
             ...this.inner.columns.map(col => `${lhsPrefix}.${col}`),
-            ...other.inner.columns.filter((_, idx) => idx !== otherColIndex).map(col => `${rhsPrefix}.${col}`),
+            ...other.inner.columns.map(col => `${rhsPrefix}.${col}`),
         ]
 
-        const joinedData: Value[][] = []
+        const otherIndexMap = new Map<string, Value[]>()
+        for (const row of other.inner.data) {
+            const keyCell = row[otherColIndex]
+            const key = keyCell.type === "text" ? keyCell.content : ""
+            otherIndexMap.set(key, row)
+        }
 
-        for (const row of largeTable.inner.data) {
-            const key = row[largeColIndex].type === "text" ? row[largeColIndex].content : ""
-            const matchingRow = lookup.get(key)
+        const newData: Value[][] = []
+        for (const row of this.inner.data) {
+            const keyCell = row[thisColIndex]
+            const key = keyCell.type === "text" ? keyCell.content : ""
 
-            if (matchingRow) {
-                const newRow = [...row, ...matchingRow.filter((_, idx) => idx !== smallColIndex)]
-                joinedData.push(newRow)
+            const otherRow = otherIndexMap.get(key)
+            if (otherRow) {
+                newData.push([...row, ...otherRow])
             }
         }
 
         return new ValueWrapper<TableValue>({
             type: "table",
-            columns: joinedColumns,
-            data: joinedData,
+            columns: newColumns,
+            data: newData,
         })
+    }
+
+    /**
+     * Applies a mapping function to each row of the table, returning a new table.
+     * The mapping function can either be a function that takes a row and returns an object
+     * with new column values, or an object mapping column names to functions that transform
+     * individual cell values.
+     */
+    map(
+        this: ValueWrapper<TableValue>,
+        mapFn: ((row: string[]) => Record<string, string>) | Record<string, (cell: string) => string>,
+        newColumnNames: Record<string, string> = {}
+    ): ValueWrapper<TableValue> {
+        // let newData: Value[][]
+
+        if (typeof mapFn === "function") {
+            const newData: Record<string, any>[] = this.inner.data.map(row =>
+                mapFn(row.map(cell => (cell.type === "text" ? cell.content : "")))
+            )
+
+            return new ValueWrapper<TableValue>({
+                type: "table",
+                columns: Object.keys(newData[0]),
+                data: newData.map(obj =>
+                    Object.values(obj).map(content => ({
+                        type: "text",
+                        content: content.toString(),
+                    }))
+                ),
+            })
+        } else {
+            return new ValueWrapper<TableValue>({
+                type: "table",
+                columns: this.inner.columns.map(col => newColumnNames[col] ?? col),
+                data: this.inner.data.map(row =>
+                    row.map((cell, idx) => {
+                        const colName = this.inner.columns[idx]
+                        const cellMapper = mapFn[colName]
+                        return cellMapper
+                            ? {
+                                  type: "text",
+                                  content: cellMapper(cell.type === "text" ? cell.content : "").toString(),
+                              }
+                            : cell
+                    })
+                ),
+            })
+        }
     }
 }

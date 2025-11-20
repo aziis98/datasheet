@@ -259,15 +259,17 @@ type Entry = {
     content: Value
 }
 
+const EXAMPLE_QUERIES = [
+    ``,
+    `customers.map(([id, name]) => { [first_name, last_name] = name.split(" "); return { id, first_name, last_name } })`,
+    `orders.join(customers, "customer_id", "id").columns("0.id", "0.date", "0.status", "1.name", "1.email")`,
+    `[...Array(100).keys()].filter(n => n > 1 && [...Array(Math.sqrt(n) | 0).keys()].slice(1).every(d => n % (d + 1)))`,
+]
+
 const App = () => {
     // const [bodyAtTop, setBodyAtTop] = useState(true)
 
-    const [query, setQuery] = useState(
-        ""
-        // dedent(`
-        //     [...Array(100).keys()].filter(n => n > 1 && [...Array(Math.sqrt(n) | 0).keys()].slice(1).every(d => n % (d + 1)))
-        // `)
-    )
+    const [query, setQuery] = useState(EXAMPLE_QUERIES[Math.floor(Math.random() * EXAMPLE_QUERIES.length)])
     const [queryTarget, setQueryTarget] = useState<string>("")
 
     const queryContainerRef = useRef<HTMLElement | null>(null)
@@ -446,7 +448,7 @@ const App = () => {
 
                             font-family: "JetBrains Mono Variable", monospace;
                             font-size: 14px;
-                            line-height: 1.25;
+                            line-height: 1.5;
 
                             z-index: 2;
                         `,
@@ -556,10 +558,10 @@ const App = () => {
                             place-items: center;
 
                             padding: 0.25rem 0.5rem;
-                            border-radius: 0.25rem;
+                            border-radius: 0.5rem;
                             opacity: 0.75;
 
-                            background: #000;
+                            background: #111;
                             color: #fff;
 
                             font-family: "JetBrains Mono Variable", monospace;

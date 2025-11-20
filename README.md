@@ -4,7 +4,7 @@
 
 A tiny, modern dataset viewer and query playground built with Preact and Vite.
 
-This project provides a fast, local UI for experimenting with tabular and text data, viewing result sets, and composing quick JavaScript-style queries inside a query bar — useful for prototyping data-centric interfaces and building a lightweight "datasheet" experience.
+This project provides a fast, local UI for experimenting with tabular and text data, viewing result sets, and composing quick JavaScript-style queries inside a query bar — useful for prototyping data-centric interfaces and workflows.
 
 ## Highlights
 
@@ -21,11 +21,16 @@ Run locally to explore the app and try the example dataset.
 ## Tech stack & package manager
 
 -   Preact (JSX runtime)
+
 -   TypeScript
+
 -   Vite (dev server, build, preview)
+
 -   preact-css-extract for scoped CSS
+
 -   Iconify for icons
--   Bun: this project includes a `bun.lock` and Bun is the recommended package manager/runtime for development and script running
+
+-   Bun as the preferred package manager
 
 ## Quick start
 
@@ -62,17 +67,7 @@ Key files and directories:
 
 -   `src/main.tsx` — App root containing the page layout, query editor, outline, and main content.
 
--   `src/example-dataset.ts` — Example dataset used by the app on startup (tables and text entries).
-
 -   `src/viewers/*.tsx` — Viewer components. Each viewer that exports a component with `Viewer` in the filename is registered automatically.
-
--   `src/viewers/types.ts` — Types for viewer values (tables, text, etc.).
-
--   `src/lib/hooks.ts` — `Optic` class and `useOpticState`, a small utility that provides immutable-ish lenses and operations for nested state.
-
--   `src/lib/utils.ts` — Utility helpers like `tryEvaluate`, `dedent`, and `arrayRepeat`.
-
--   `src/components/*` — Reusable UI components such as `AutosizeInput` and an Icon wrapper.
 
 ## Usage
 
