@@ -2,10 +2,14 @@
 // Demonstrates the ?name syntax for capturing values in match expressions and assignments
 
 // Define an Option type
-type Option := | Some [ value: String ] | None
+type Option := 
+| Some [ value: String ] 
+| None
 
 // Define a Result type  
-type Result := | Ok [ data: String ] | Err [ message: String ]
+type Result := 
+| Ok [ data: String ] 
+| Err [ message: String ]
 
 // ============================================================================
 // 1. Simple Pattern Matching with Captures in Match Expressions
