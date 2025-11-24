@@ -3,7 +3,8 @@
 import { readFile } from "fs/promises"
 import { resolve } from "path"
 import { Interpreter } from "./interpreter"
-import { Lexer, parse } from "./parser"
+import { Lexer } from "./lexer"
+import { parse } from "./parser"
 
 // Parse command line arguments
 const args = Bun.argv.slice(2)

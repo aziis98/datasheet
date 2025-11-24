@@ -415,7 +415,7 @@ describe("Lexer and Parser", () => {
 
     describe("Match Expressions", () => {
         test("parses match expression", () => {
-            const ast = parse("match x: 1 => true")
+            const ast = parse("match x { 1 => true }")
             expect(ast[0]).toMatchObject({
                 type: "matchExpression",
                 value: { type: "identifier", name: "x" },
@@ -430,7 +430,7 @@ describe("Lexer and Parser", () => {
         })
 
         test("parses match with multiple arms", () => {
-            const ast = parse('match value: 1 => "one"; 2 => "two"')
+            const ast = parse('match value { 1 => "one", 2 => "two" }')
             expect(ast[0]).toMatchObject({
                 type: "matchExpression",
                 value: { type: "identifier", name: "value" },
