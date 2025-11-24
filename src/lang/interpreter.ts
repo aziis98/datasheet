@@ -1,39 +1,40 @@
-import type {
-    Assignment,
-    ASTNode,
-    BinaryOp,
-    Block,
-    FieldAccess,
-    Identifier,
-    Literal,
-    MatchExpression,
-    MethodCall,
-    UnaryOp,
-} from "./types"
+/**
+ * INTERPRETER - Multi-Dispatch Based Interpreter
+ *
+ * This interpreter uses the multi-dispatch system for all operators and built-in functions.
+ * All values are wrapped in RuntimeValue with type metadata.
+ */
 
-export type Value =
-    | number
-    | string
-    | boolean
-    | null
-    | undefined
-    | { [key: string]: Value }
-    | Value[]
-    | ((args: Value[]) => Value)
+import {
+    ArrayT,
+    BooleanT,
+    BUILTIN_FUNCTIONS,
+    BUILTIN_METHODS,
+    BUILTIN_OPERATORS,
+    BUILTIN_TYPES,
+    IntT,
+    NumberT,
+    StringT,
+} from "./builtins"
+import { BaseType } from "./type-system"
+import type { ASTNode, RuntimeValue } from "./types"
 
+/**
+ * Environment for storing variable bindings
+ */
 export class Environment {
-    private variables: Map<string, Value> = new Map()
+    private variables: Map<string, RuntimeValue> = new Map()
     private parent: Environment | null = null
 
     constructor(parent: Environment | null = null) {
         this.parent = parent
     }
 
-    define(name: string, value: Value): void {
+    define(name: string, value: RuntimeValue): void {
         this.variables.set(name, value)
     }
 
-    get(name: string): Value {
+    get(name: string): RuntimeValue {
         if (this.variables.has(name)) {
             return this.variables.get(name)!
         }
@@ -43,7 +44,7 @@ export class Environment {
         throw new Error(`Undefined variable: ${name}`)
     }
 
-    set(name: string, value: Value): void {
+    set(name: string, value: RuntimeValue): void {
         if (this.variables.has(name)) {
             this.variables.set(name, value)
         } else if (this.parent) {
@@ -54,6 +55,9 @@ export class Environment {
     }
 }
 
+/**
+ * Interpreter with multi-dispatch support
+ */
 export class Interpreter {
     private globalEnv: Environment
 
@@ -63,97 +67,59 @@ export class Interpreter {
     }
 
     private initializeBuiltins(): void {
-        // Add built-in functions
-        this.globalEnv.define("print", (args: Value[]) => {
-            console.log(...args.map(v => this.valueToString(v)))
-            return undefined
-        })
-
-        this.globalEnv.define("add", (args: Value[]) => {
-            if (args.length !== 2) throw new Error("add expects 2 arguments")
-            return Number(args[0]) + Number(args[1])
-        })
-
-        this.globalEnv.define("sub", (args: Value[]) => {
-            if (args.length !== 2) throw new Error("sub expects 2 arguments")
-            return Number(args[0]) - Number(args[1])
-        })
-
-        this.globalEnv.define("mul", (args: Value[]) => {
-            if (args.length !== 2) throw new Error("mul expects 2 arguments")
-            return Number(args[0]) * Number(args[1])
-        })
-
-        this.globalEnv.define("div", (args: Value[]) => {
-            if (args.length !== 2) throw new Error("div expects 2 arguments")
-            const divisor = Number(args[1])
-            if (divisor === 0) throw new Error("Division by zero")
-            return Number(args[0]) / divisor
-        })
-
-        this.globalEnv.define("len", (args: Value[]) => {
-            if (args.length !== 1) throw new Error("len expects 1 argument")
-            const val = args[0]
-            if (typeof val === "string") return val.length
-            if (Array.isArray(val)) return val.length
-            if (typeof val === "object" && val !== null) return Object.keys(val).length
-            throw new Error("len: invalid argument type")
-        })
-
-        this.globalEnv.define("type", (args: Value[]) => {
-            if (args.length !== 1) throw new Error("type expects 1 argument")
-            const val = args[0]
-            if (val === null) return "null"
-            if (Array.isArray(val)) return "array"
-            if (typeof val === "function") return "function"
-            return typeof val
-        })
+        // Register built-in functions
+        for (const [name, fn] of BUILTIN_FUNCTIONS.entries()) {
+            this.globalEnv.define(name, {
+                value: fn,
+                __type__: BUILTIN_TYPES.get("Any")!,
+            })
+        }
     }
 
-    interpret(nodes: ASTNode[]): Value {
-        let result: Value = undefined
+    interpret(nodes: ASTNode[]): any {
+        let result: RuntimeValue = wrapValue(undefined, BUILTIN_TYPES.get("Undefined")!)
 
         for (const node of nodes) {
             result = this.evaluate(node, this.globalEnv)
         }
 
-        return result
+        return unwrapValue(result)
     }
 
-    private evaluate(node: ASTNode, env: Environment): Value {
+    private evaluate(node: ASTNode, env: Environment): RuntimeValue {
         switch (node.type) {
             case "literal":
-                return this.evaluateLiteral(node as Literal)
+                return this.evaluateLiteral(node as any, env)
 
             case "identifier":
-                return env.get((node as Identifier).name)
+                return this.evaluateIdentifier(node as any, env)
 
             case "binaryOp":
-                return this.evaluateBinaryOp(node as BinaryOp, env)
+                return this.evaluateBinaryOp(node as any, env)
 
             case "unaryOp":
-                return this.evaluateUnaryOp(node as UnaryOp, env)
+                return this.evaluateUnaryOp(node as any, env)
 
             case "assignment":
-                return this.evaluateAssignment(node as Assignment, env)
+                return this.evaluateAssignment(node as any, env)
 
             case "fieldAccess":
-                return this.evaluateFieldAccess(node as FieldAccess, env)
+                return this.evaluateFieldAccess(node as any, env)
 
             case "methodCall":
-                return this.evaluateMethodCall(node as MethodCall, env)
+                return this.evaluateMethodCall(node as any, env)
 
             case "block":
-                return this.evaluateBlock(node as Block, env)
+                return this.evaluateBlock(node as any, env)
 
             case "matchExpression":
-                return this.evaluateMatch(node as MatchExpression, env)
+                return this.evaluateMatch(node as any, env)
 
             case "typeInstance":
                 return this.evaluateTypeInstance(node as any, env)
 
             case "functionDeclaration":
-                return this.evaluateFunctionDeclaration(node, env)
+                return this.evaluateFunctionDeclaration(node as any, env)
 
             case "typeDeclaration":
                 return this.evaluateTypeDeclaration(node as any, env)
@@ -163,237 +129,193 @@ export class Interpreter {
         }
     }
 
-    private evaluateLiteral(node: Literal): Value {
-        return node.value
+    private evaluateLiteral(node: any, _env: Environment): RuntimeValue {
+        const valueType = node.valueType
+        const value = node.value
+
+        if (valueType === "number") {
+            return wrapValue(value, NumberT)
+        } else if (valueType === "string") {
+            return wrapValue(value, StringT)
+        } else if (valueType === "boolean") {
+            return wrapValue(value, BooleanT)
+        }
+
+        return wrapValue(value, BUILTIN_TYPES.get("Any")!)
     }
 
-    private evaluateBinaryOp(node: BinaryOp, env: Environment): Value {
+    private evaluateIdentifier(node: any, env: Environment): RuntimeValue {
+        return env.get(node.name)
+    }
+
+    private evaluateBinaryOp(node: any, env: Environment): RuntimeValue {
         const left = this.evaluate(node.left, env)
         const right = this.evaluate(node.right, env)
+        const operator = node.operator
 
-        switch (node.operator) {
-            case "+":
-                if (typeof left === "string" || typeof right === "string") {
-                    return this.valueToString(left) + this.valueToString(right)
-                }
-                return Number(left) + Number(right)
-
-            case "-":
-                return Number(left) - Number(right)
-
-            case "*":
-                if (typeof left === "string" && typeof right === "number") {
-                    return left.repeat(right)
-                }
-                if (typeof right === "string" && typeof left === "number") {
-                    return right.repeat(left)
-                }
-                return Number(left) * Number(right)
-
-            case "/":
-                const divisor = Number(right)
-                if (divisor === 0) throw new Error("Division by zero")
-                return Number(left) / divisor
-
-            case "%":
-                return Number(left) % Number(right)
-
-            case "^":
-                return Math.pow(Number(left), Number(right))
-
-            case "==":
-                return left === right
-
-            case "!=":
-                return left !== right
-
-            case "<":
-                return Number(left) < Number(right)
-
-            case ">":
-                return Number(left) > Number(right)
-
-            case "<=":
-                return Number(left) <= Number(right)
-
-            case ">=":
-                return Number(left) >= Number(right)
-
-            case "&&":
-                return this.isTruthy(left) && this.isTruthy(right)
-
-            case "||":
-                return this.isTruthy(left) || this.isTruthy(right)
-
-            default:
-                throw new Error(`Unknown binary operator: ${node.operator}`)
+        const opFunc = BUILTIN_OPERATORS.get(operator)
+        if (!opFunc) {
+            throw new Error(`Unknown operator: ${operator}`)
         }
+
+        return opFunc.call(left, right) as RuntimeValue
     }
 
-    private evaluateUnaryOp(node: UnaryOp, env: Environment): Value {
+    private evaluateUnaryOp(node: any, env: Environment): RuntimeValue {
         const operand = this.evaluate(node.operand, env)
+        const operator = node.operator
 
-        switch (node.operator) {
-            case "-":
-                return -Number(operand)
-
-            case "!":
-                return !this.isTruthy(operand)
-
-            default:
-                throw new Error(`Unknown unary operator: ${node.operator}`)
+        const opKey = operator === "-" ? "unary-" : operator
+        const opFunc = BUILTIN_OPERATORS.get(opKey)
+        if (!opFunc) {
+            throw new Error(`Unknown unary operator: ${operator}`)
         }
+
+        return opFunc.call(operand) as RuntimeValue
     }
 
-    private evaluateAssignment(node: Assignment, env: Environment): Value {
+    private evaluateAssignment(node: any, env: Environment): RuntimeValue {
         const value = this.evaluate(node.value, env)
 
-        // If there's a pattern, use pattern matching to bind captures
         if (node.pattern) {
             const captures = this.tryMatch(node.pattern, value, env)
             if (captures === null) {
-                throw new Error(`Pattern match failed in assignment`)
+                throw new Error(`Pattern match failed for assignment`)
             }
-            // Bind all captured variables
             for (const [name, capturedValue] of Object.entries(captures)) {
-                env.define(name, capturedValue)
+                env.set(name, capturedValue)
             }
         } else {
-            // Simple assignment
             env.set(node.variable, value)
         }
+
         return value
     }
 
-    private evaluateFieldAccess(node: FieldAccess, env: Environment): Value {
+    private evaluateFieldAccess(node: any, env: Environment): RuntimeValue {
         const obj = this.evaluate(node.object, env)
+        const fieldName = node.field
 
-        if (typeof obj === "object" && obj !== null && !Array.isArray(obj)) {
-            return (obj as Record<string, Value>)[node.field]
+        if (typeof obj.value === "object" && obj.value !== null && !Array.isArray(obj.value)) {
+            const fieldValue = obj.value[fieldName]
+            if (fieldValue !== undefined) {
+                if (isRuntimeValue(fieldValue)) {
+                    return fieldValue
+                }
+                return wrapValue(fieldValue, BUILTIN_TYPES.get("Any")!)
+            }
         }
 
-        if (Array.isArray(obj) && node.field === "length") {
-            return obj.length
+        if (Array.isArray(obj.value) && fieldName === "length") {
+            return wrapValue(obj.value.length, IntT)
         }
 
-        if (typeof obj === "string" && node.field === "length") {
-            return obj.length
+        if (typeof obj.value === "string" && fieldName === "length") {
+            return wrapValue(obj.value.length, IntT)
         }
 
-        throw new Error(`Cannot access field ${node.field} on ${typeof obj}`)
+        throw new Error(`Cannot access field ${fieldName} on ${obj.__type__.toString()}`)
     }
 
-    private evaluateMethodCall(node: MethodCall, env: Environment): Value {
-        const args = node.arguments.map(arg => this.evaluate(arg, env))
+    private evaluateMethodCall(node: any, env: Environment): RuntimeValue {
+        const args = node.arguments.map((arg: ASTNode) => this.evaluate(arg, env))
 
-        // Check if this is a global function call (object is "global" identifier)
-        if (node.object.type === "identifier" && (node.object as Identifier).name === "global") {
-            const func = env.get(node.method)
-            if (typeof func === "function") {
-                return func(args)
+        // Check if this is a global function call
+        if (node.object.type === "identifier" && node.object.name === "global") {
+            const funcName = node.method
+            const func = env.get(funcName)
+
+            if (func.value && typeof func.value.call === "function") {
+                // It's a GenericFunction
+                const argsArray = wrapValue(args, ArrayT(BUILTIN_TYPES.get("Any")!))
+                return func.value.call(argsArray) as RuntimeValue
             }
-            throw new Error(`${node.method} is not a function`)
+
+            if (typeof func.value === "function") {
+                // Regular function - could be ADT constructor or user-defined
+                const result = func.value(args)
+
+                // If result is already a RuntimeValue, return it
+                if (isRuntimeValue(result)) {
+                    return result
+                }
+
+                // Otherwise wrap it
+                return wrapValue(result, BUILTIN_TYPES.get("Any")!)
+            }
+
+            throw new Error(`${funcName} is not a function`)
         }
 
         const obj = this.evaluate(node.object, env)
+        const methodName = node.method
 
-        // Handle string methods
-        if (typeof obj === "string") {
-            if (node.method === "format") {
-                if (args.length !== 1 || typeof args[0] !== "string") {
-                    throw new Error("format expects a string argument")
+        // Check for built-in methods
+        const method = BUILTIN_METHODS.get(methodName)
+        if (method) {
+            return method.call(obj, ...args) as RuntimeValue
+        }
+
+        // Handle string format method
+        if (obj.__type__ === StringT && methodName === "format") {
+            const stringFormatMethod = BUILTIN_METHODS.get("string_format")
+            if (stringFormatMethod) {
+                const argsArray = wrapValue(args.map(unwrapValue), ArrayT(BUILTIN_TYPES.get("Any")!))
+                return stringFormatMethod.call(obj, argsArray) as RuntimeValue
+            }
+        }
+
+        // Handle array methods
+        if (Array.isArray(obj.value)) {
+            if (methodName === "format") {
+                const arrayFormatMethod = BUILTIN_METHODS.get("format")
+                if (arrayFormatMethod && args.length > 0) {
+                    return arrayFormatMethod.call(obj, args[0]) as RuntimeValue
                 }
-                return this.formatString(args[0], [obj])
             }
         }
 
-        // Handle object method calls
-        if (typeof obj === "object" && obj !== null) {
-            if (Array.isArray(obj)) {
-                return this.evaluateArrayMethod(obj, node.method, args)
-            }
-            if (typeof (obj as any)[node.method] === "function") {
-                return (obj as any)[node.method](...args)
-            }
-        }
-
-        throw new Error(`Method ${node.method} not found`)
+        throw new Error(`Method ${methodName} not found on ${obj.__type__.toString()}`)
     }
 
-    private evaluateArrayMethod(arr: Value[], method: string, args: Value[]): Value {
-        switch (method) {
-            case "map":
-                if (args.length !== 1 || typeof args[0] !== "function") {
-                    throw new Error("map expects a function")
-                }
-                return arr.map(item => (args[0] as Function)(item))
-
-            case "filter":
-                if (args.length !== 1 || typeof args[0] !== "function") {
-                    throw new Error("filter expects a function")
-                }
-                return arr.filter(item => this.isTruthy((args[0] as Function)(item)))
-
-            case "reduce":
-                if (args.length < 1 || typeof args[0] !== "function") {
-                    throw new Error("reduce expects a function")
-                }
-                let acc = args.length > 1 ? args[1] : arr[0]
-                const startIdx = args.length > 1 ? 0 : 1
-                for (let i = startIdx; i < arr.length; i++) {
-                    acc = (args[0] as Function)(acc, arr[i])
-                }
-                return acc
-
-            case "join":
-                return arr.map(v => this.valueToString(v)).join(this.valueToString(args[0] ?? ""))
-
-            case "push":
-                arr.push(...args)
-                return arr.length
-
-            case "pop":
-                return arr.pop()
-
-            case "format":
-                if (args.length !== 1 || typeof args[0] !== "string") {
-                    throw new Error("format expects a string argument")
-                }
-                return this.formatString(args[0], arr)
-
-            default:
-                throw new Error(`Array method ${method} not found`)
-        }
-    }
-
-    private evaluateBlock(node: Block, env: Environment): Value {
-        // If the block has parameters, return a closure function
+    private evaluateBlock(node: any, env: Environment): RuntimeValue {
+        // If block has parameters, return a closure function
         if (node.parameters && node.parameters.length > 0) {
-            // Return a function that can be called with individual arguments or an array
-            const closure = (...args: any[]) => {
+            const closure = (...fnArgs: any[]) => {
                 const blockEnv = new Environment(env)
 
-                // Handle both single call style and array call style
-                const actualArgs = Array.isArray(args[0]) ? args[0] : args
+                // Handle both array and individual arguments
+                const actualArgs = fnArgs.length === 1 && Array.isArray(fnArgs[0]) ? fnArgs[0] : fnArgs
 
-                // Bind parameters to arguments
-                for (let i = 0; i < node.parameters!.length; i++) {
-                    blockEnv.define(node.parameters![i], actualArgs[i])
+                for (let i = 0; i < node.parameters.length; i++) {
+                    const paramName = node.parameters[i]
+                    const argValue = actualArgs[i]
+
+                    if (argValue !== undefined) {
+                        if (isRuntimeValue(argValue)) {
+                            blockEnv.define(paramName, argValue)
+                        } else {
+                            blockEnv.define(paramName, wrapValue(argValue, BUILTIN_TYPES.get("Any")!))
+                        }
+                    } else {
+                        blockEnv.define(paramName, wrapValue(null, BUILTIN_TYPES.get("Null")!))
+                    }
                 }
 
-                // Execute block body
-                let result: Value = undefined
+                let result: RuntimeValue = wrapValue(undefined, BUILTIN_TYPES.get("Undefined")!)
                 for (const stmt of node.body) {
                     result = this.evaluate(stmt, blockEnv)
                 }
+
                 return result
             }
-            return closure
+
+            return wrapValue(closure, BUILTIN_TYPES.get("Any")!)
         }
 
-        // For blocks without parameters, just execute the statements
+        // Regular block
         const blockEnv = new Environment(env)
-        let result: Value = undefined
+        let result: RuntimeValue = wrapValue(undefined, BUILTIN_TYPES.get("Undefined")!)
 
         for (const stmt of node.body) {
             result = this.evaluate(stmt, blockEnv)
@@ -402,300 +324,239 @@ export class Interpreter {
         return result
     }
 
-    private evaluateMatch(node: MatchExpression, env: Environment): Value {
+    private evaluateMatch(node: any, env: Environment): RuntimeValue {
         const value = this.evaluate(node.value, env)
 
         for (const arm of node.arms) {
-            const patternType = (arm.pattern as any).type
+            const armEnv = new Environment(env)
+            const captures = this.tryMatch(arm.pattern, value, armEnv)
 
-            // Check if pattern is a capture pattern (?name) - matches anything and binds
-            if (patternType === "capturePattern") {
-                const name = (arm.pattern as any).name
-                const bodyEnv = new Environment(env)
-                bodyEnv.define(name, value)
-                return this.evaluate(arm.body, bodyEnv)
-            }
-
-            // Check if pattern is a simple identifier (e.g., matching ADT variant name or wildcard)
-            if (patternType === "identifier") {
-                const variantName = (arm.pattern as any).name
-
-                // Wildcard pattern "?" matches anything
-                if (variantName === "?") {
-                    return this.evaluate(arm.body, env)
+            if (captures !== null) {
+                for (const [name, capturedValue] of Object.entries(captures)) {
+                    armEnv.define(name, capturedValue)
                 }
-
-                // Check if value is an ADT instance with matching variant
-                if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-                    const obj = value as Record<string, Value>
-                    if (obj.__variant === variantName) {
-                        return this.evaluate(arm.body, env)
-                    }
-                }
-            } else if (patternType === "typeInstance") {
-                // Pattern matching with potential captures: Ok [ ?value ]
-                const captures = this.tryMatch(arm.pattern, value, env)
-                if (captures !== null) {
-                    const bodyEnv = new Environment(env)
-                    for (const [name, capturedValue] of Object.entries(captures)) {
-                        bodyEnv.define(name, capturedValue as Value)
-                    }
-                    return this.evaluate(arm.body, bodyEnv)
-                }
-            } else {
-                // Evaluate pattern and try to match
-                const pattern = this.evaluate(arm.pattern, env)
-                if (this.matchesPattern(value, pattern)) {
-                    return this.evaluate(arm.body, env)
-                }
+                return this.evaluate(arm.body, armEnv)
             }
         }
 
         throw new Error("No matching pattern found")
     }
-    private matchesPattern(value: Value, pattern: Value): boolean {
-        if (typeof pattern === "number") {
-            return value === pattern
-        }
-        if (typeof pattern === "string") {
-            return value === pattern
-        }
-        if (typeof pattern === "boolean") {
-            return value === pattern
-        }
-        return value === pattern
-    }
 
-    /**
-     * Try to match a pattern against a value and extract bindings.
-     * Returns a map of variable names to their captured values, or null if no match.
-     *
-     * Pattern format:
-     * - Identifier: variantName
-     * - Capture pattern: { type: "capturePattern", name: "varName" }
-     * - Structure: { type: "typeInstance", typeName: "VariantName", fields: [...] }
-     */
-    private tryMatch(patternNode: ASTNode, value: Value, env: Environment): Record<string, Value> | null {
+    private tryMatch(patternNode: ASTNode, value: RuntimeValue, env: Environment): Record<string, RuntimeValue> | null {
         const pattern = patternNode as any
 
-        // Simple identifier pattern - must match variant name
+        // Simple identifier pattern
         if (pattern.type === "identifier") {
-            const variantName = pattern.name
-            if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-                const obj = value as Record<string, Value>
-                if (obj.__variant === variantName) {
-                    return {} // Matched, no captures
-                }
+            const val = unwrapValue(value)
+            if (typeof val === "object" && val !== null && val.__adt) {
+                return val.__variant === pattern.name ? {} : null
             }
-            return null
+            return pattern.name === unwrapValue(value) ? {} : null
         }
 
-        // Capture pattern - matches anything and binds to a variable
+        // Capture pattern
         if (pattern.type === "capturePattern") {
+            if (pattern.name === "?") {
+                return {}
+            }
             return { [pattern.name]: value }
         }
 
-        // Structure pattern with potential field captures: VariantName [ ?field1, ?field2: [...] ]
+        // Type instance pattern
         if (pattern.type === "typeInstance") {
-            const variantName = pattern.typeName
+            const val = unwrapValue(value)
+            if (typeof val !== "object" || val === null) return null
 
-            // Check if value is an ADT instance with matching variant
-            if (typeof value !== "object" || value === null || Array.isArray(value)) {
-                return null
-            }
+            if (val.__adt && val.__variant === pattern.typeName) {
+                const captures: Record<string, RuntimeValue> = {}
+                const fields = pattern.fields
 
-            const obj = value as Record<string, Value>
-            if (obj.__variant !== variantName) {
-                return null // Variant doesn't match
-            }
+                for (let i = 0; i < fields.length; i++) {
+                    const field = fields[i]
+                    const fieldValue = val[field.key]
 
-            // Matched the variant, now process field patterns
-            const captures: Record<string, Value> = {}
-
-            for (const field of pattern.fields) {
-                const fieldName = field.key
-                const fieldPattern = field.value as any
-
-                // Get the value from the object
-                const fieldValue = obj[fieldName]
-
-                // Handle capture patterns
-                if (fieldPattern.type === "capturePattern") {
-                    // ?fieldName - bind the field value to this name
-                    captures[fieldPattern.name] = fieldValue
-
-                    // Check if there's a nested pattern to match
-                    if (fieldPattern.pattern) {
-                        const nestedCaptures = this.tryMatch(fieldPattern.pattern, fieldValue, env)
-                        if (nestedCaptures === null) {
-                            return null // Nested pattern didn't match
+                    if (field.value.type === "capturePattern") {
+                        const captureName = field.value.name
+                        if (captureName !== "?") {
+                            const wrappedFieldValue = isRuntimeValue(fieldValue)
+                                ? fieldValue
+                                : wrapValue(fieldValue, BUILTIN_TYPES.get("Any")!)
+                            captures[captureName] = wrappedFieldValue
                         }
-                        // Merge nested captures
-                        Object.assign(captures, nestedCaptures)
-                    }
-                } else if (fieldPattern.type === "typeInstance") {
-                    // Nested structure pattern
-                    const nestedCaptures = this.tryMatch(fieldPattern, fieldValue, env)
-                    if (nestedCaptures === null) {
-                        return null
-                    }
-                    Object.assign(captures, nestedCaptures)
-                } else {
-                    // Literal pattern - must match exactly
-                    const literalValue = this.evaluate(fieldPattern, env)
-                    if (!this.matchesPattern(fieldValue, literalValue)) {
-                        return null
+
+                        if (field.value.pattern) {
+                            const wrappedFieldValue = isRuntimeValue(fieldValue)
+                                ? fieldValue
+                                : wrapValue(fieldValue, BUILTIN_TYPES.get("Any")!)
+                            const nestedCaptures = this.tryMatch(field.value.pattern, wrappedFieldValue, env)
+                            if (nestedCaptures === null) return null
+                            Object.assign(captures, nestedCaptures)
+                        }
+                    } else {
+                        const wrappedFieldValue = isRuntimeValue(fieldValue)
+                            ? fieldValue
+                            : wrapValue(fieldValue, BUILTIN_TYPES.get("Any")!)
+                        const fieldCaptures = this.tryMatch(field.value, wrappedFieldValue, env)
+                        if (fieldCaptures === null) return null
+                        Object.assign(captures, fieldCaptures)
                     }
                 }
+
+                return captures
             }
 
-            return captures
+            return null
         }
 
-        // Unknown pattern type
+        // Literal pattern
+        if (pattern.type === "literal") {
+            return pattern.value === unwrapValue(value) ? {} : null
+        }
+
         return null
     }
 
-    private formatString(formatStr: string, values: Value[]): string {
-        let result = formatStr
+    private evaluateTypeInstance(node: any, env: Environment): RuntimeValue {
+        if (node.typeName === "Array") {
+            const elements = node.fields.map((field: any) => this.evaluate(field.value, env))
+            return wrapValue(elements, ArrayT(BUILTIN_TYPES.get("Any")!))
+        }
 
-        // Replace {} with values in order
-        let valueIndex = 0
-        result = result.replace(/{}/g, () => {
-            if (valueIndex < values.length) {
-                return this.valueToString(values[valueIndex++])
+        // Check if it's an ADT constructor
+        try {
+            const constructor = env.get(node.typeName)
+            if (constructor.value && typeof constructor.value === "function") {
+                // Extract field values in order
+                const args = node.fields.map((field: any) => this.evaluate(field.value, env))
+                const result = constructor.value(...args)
+
+                // If result is already a RuntimeValue, return it
+                if (isRuntimeValue(result)) {
+                    return result
+                }
+
+                // Otherwise wrap it
+                return wrapValue(result, BUILTIN_TYPES.get("Any")!)
             }
-            return "{}"
-        })
+        } catch {
+            // Not a constructor, fall through
+        }
 
-        // Replace {0}, {1}, etc. with indexed values (0-based indexing)
-        result = result.replace(/{(\d+)}/g, (_, indexStr) => {
-            const index = parseInt(indexStr, 10)
-            if (index >= 0 && index < values.length) {
-                return this.valueToString(values[index])
-            }
-            return `{${indexStr}}`
-        })
-
-        return result
+        // Object construction
+        const obj: Record<string, any> = {}
+        for (const field of node.fields) {
+            obj[field.key] = this.evaluate(field.value, env)
+        }
+        return wrapValue(obj, BUILTIN_TYPES.get("Any")!)
     }
 
-    private evaluateFunctionDeclaration(node: any, env: Environment): Value {
-        const params = node.parameters.map((p: any) => p.name)
+    private evaluateFunctionDeclaration(node: any, env: Environment): RuntimeValue {
+        const name = node.name
+        const params = node.parameters
         const body = node.body
 
-        const func = (args: Value[]) => {
+        const func = (fnArgs: any[]) => {
             const funcEnv = new Environment(env)
 
             for (let i = 0; i < params.length; i++) {
-                funcEnv.define(params[i], args[i])
+                const paramName = params[i].name
+                const argValue = fnArgs[i]
+
+                if (isRuntimeValue(argValue)) {
+                    funcEnv.define(paramName, argValue)
+                } else {
+                    funcEnv.define(paramName, wrapValue(argValue, BUILTIN_TYPES.get("Any")!))
+                }
             }
 
             return this.evaluate(body, funcEnv)
         }
 
-        if (node.name) {
-            env.define(node.name, func)
-        }
+        const funcValue = wrapValue(func, BUILTIN_TYPES.get("Any")!)
+        env.define(name, funcValue)
 
-        return func
+        return funcValue
     }
 
-    private evaluateTypeDeclaration(node: any, env: Environment): Value {
+    private evaluateTypeDeclaration(node: any, env: Environment): RuntimeValue {
         const typeName = node.name
 
-        // If this is an ADT (has variants), register variant constructors
+        // If this is an ADT, register variant constructors
         if (node.variants && node.variants.length > 0) {
             for (const variant of node.variants) {
                 const variantName = variant.name
                 const variantFields = variant.fields
 
-                // Create constructor function for this variant
-                const variantConstructor = (args: Value[]) => {
-                    const instance: Record<string, Value> = {
+                // Parameter-less variants are simple values
+                if (variantFields.length === 0) {
+                    const instance = {
                         __adt: typeName,
                         __variant: variantName,
                     }
+                    env.define(variantName, wrapValue(instance, BUILTIN_TYPES.get("Any")!))
+                } else {
+                    // Variants with parameters are constructors
+                    const variantConstructor = (...args: any[]) => {
+                        const instance: Record<string, any> = {
+                            __adt: typeName,
+                            __variant: variantName,
+                        }
 
-                    // Bind provided field values
-                    for (let i = 0; i < variantFields.length; i++) {
-                        const fieldName = variantFields[i].name
-                        instance[fieldName] = args[i] !== undefined ? args[i] : null
+                        for (let i = 0; i < variantFields.length; i++) {
+                            const fieldName = variantFields[i].name
+                            const argValue = args[i]
+
+                            // Properly unwrap the argument
+                            if (argValue !== undefined) {
+                                instance[fieldName] = unwrapValue(argValue)
+                            } else {
+                                instance[fieldName] = null
+                            }
+                        }
+
+                        return wrapValue(instance, BUILTIN_TYPES.get("Any")!)
                     }
 
-                    return instance
+                    env.define(variantName, wrapValue(variantConstructor, BUILTIN_TYPES.get("Any")!))
                 }
-
-                env.define(variantName, variantConstructor)
             }
         }
 
-        // Return undefined as type declarations don't produce values
-        return undefined
+        return wrapValue(undefined, BUILTIN_TYPES.get("Undefined")!)
     }
+}
 
-    private evaluateTypeInstance(node: any, env: Environment): Value {
-        if (node.typeName === "Array") {
-            // Handle array construction
-            return node.fields.map((field: any) => this.evaluate(field.value, env))
+// ==================== Helper Functions ====================
+
+export function wrapValue(value: any, type: BaseType): RuntimeValue {
+    return { value, __type__: type }
+}
+
+export function unwrapValue(rv: RuntimeValue | any): any {
+    if (isRuntimeValue(rv)) {
+        const val = rv.value
+
+        // Recursively unwrap arrays
+        if (Array.isArray(val)) {
+            return val.map(unwrapValue)
         }
 
-        // Check if this is a constructor function (e.g., a registered ADT variant)
-        try {
-            const constructor = env.get(node.typeName)
-            if (typeof constructor === "function") {
-                // This is a constructor - call it with field values as arguments
-                const args = node.fields.map((field: any) => this.evaluate(field.value, env))
-                return constructor(args)
+        // Recursively unwrap objects (but not ADT instances)
+        if (typeof val === "object" && val !== null && !val.__adt) {
+            const result: any = {}
+            for (const [key, value] of Object.entries(val)) {
+                if (key !== "__type__") {
+                    result[key] = unwrapValue(value)
+                }
             }
-        } catch (e) {
-            // Not a constructor, fall through to object construction
+            return result
         }
 
-        // Handle object construction
-        const obj: Record<string, Value> = {}
-        for (const field of node.fields) {
-            obj[field.key] = this.evaluate(field.value, env)
-        }
-        return obj
+        return val
     }
+    return rv
+}
 
-    private isTruthy(value: Value): boolean {
-        if (value === null || value === undefined || value === false) {
-            return false
-        }
-        if (value === 0 || value === "") {
-            return false
-        }
-        return true
-    }
-
-    private valueToString(value: Value): string {
-        if (value === null) return "null"
-        if (value === undefined) return "undefined"
-        if (typeof value === "string") return value
-        if (typeof value === "boolean") return value ? "true" : "false"
-        if (typeof value === "function") return "[Function]"
-        if (Array.isArray(value)) {
-            return `[${value.map(v => this.valueToString(v)).join(", ")}]`
-        }
-        if (typeof value === "object") {
-            const obj = value as Record<string, Value>
-            // Check if this is an ADT instance
-            if (obj.__adt && obj.__variant) {
-                const fields = Object.entries(obj)
-                    .filter(([k]) => k !== "__adt" && k !== "__variant")
-                    .map(([k, v]) => `${k}: ${this.valueToString(v)}`)
-                    .join(", ")
-                const variantStr = String(obj.__variant)
-                return fields ? `${variantStr} { ${fields} }` : variantStr
-            }
-            // Regular object
-            const entries = Object.entries(obj)
-                .map(([k, v]) => `${k}: ${this.valueToString(v)}`)
-                .join(", ")
-            return `{${entries}}`
-        }
-        return String(value)
-    }
+function isRuntimeValue(val: any): val is RuntimeValue {
+    return val !== null && typeof val === "object" && "__type__" in val && "value" in val
 }

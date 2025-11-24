@@ -3,7 +3,6 @@
 import { readFile } from "fs/promises"
 import { resolve } from "path"
 import { Interpreter } from "./interpreter"
-import { InterpreterV2 } from "./interpreter-v2"
 import { Lexer } from "./lexer"
 import { parse } from "./parser"
 import { TypeChecker, createDefaultTypeEnvironment } from "./type-checker"
@@ -11,7 +10,7 @@ import { TypeChecker, createDefaultTypeEnvironment } from "./type-checker"
 // Parse command line arguments
 const args = Bun.argv.slice(2)
 
-let mode: "lexer" | "ast" | "eval" | "eval-v2" | "typecheck" | null = null
+let mode: "lexer" | "ast" | "eval" | "typecheck" | null = null
 let expression: string | null = null
 let filePath: string | null = null
 let printSource = false
@@ -26,8 +25,6 @@ for (let i = 0; i < args.length; i++) {
         mode = "ast"
     } else if (arg === "--eval") {
         mode = "eval"
-    } else if (arg === "--eval-v2") {
-        mode = "eval-v2"
     } else if (arg === "--typecheck") {
         mode = "typecheck"
     } else if (arg === "--print") {
@@ -56,13 +53,10 @@ if (filePath && !mode) {
 }
 
 if (!mode) {
-    console.error(
-        "Usage: cli.ts [--lexer|--ast|--eval|--eval-v2|--typecheck] [-c <expression>|<file.lang>] [--print] [--pretty]"
-    )
+    console.error("Usage: cli.ts [--lexer|--ast|--eval|--typecheck] [-c <expression>|<file.lang>] [--print] [--pretty]")
     console.error("  --lexer              Output tokens from lexer")
     console.error("  --ast                Output AST")
     console.error("  --eval               Evaluate expression (default for files)")
-    console.error("  --eval-v2            Evaluate with v2 interpreter (multi-dispatch)")
     console.error("  --typecheck          Type check code without executing")
     console.error("  --print              Print source code before processing")
     console.error("  --pretty             Pretty print typed AST as tree (with --typecheck)")
@@ -350,11 +344,6 @@ try {
     } else if (mode === "eval") {
         const ast = parse(expression)
         const interpreter = new Interpreter()
-        const result = interpreter.interpret(ast)
-        console.log(result)
-    } else if (mode === "eval-v2") {
-        const ast = parse(expression)
-        const interpreter = new InterpreterV2()
         const result = interpreter.interpret(ast)
         console.log(result)
     }
