@@ -722,7 +722,8 @@ export class Parser {
 
         // Check if this is a method call with a block argument
         if (this.check("{")) {
-            const block = this.parseExpression(0)
+            // Parse the block directly (don't use parseExpression to avoid continuing operator parsing)
+            const block = this.parseBlock()
             return {
                 type: "methodCall",
                 object: left,
@@ -1370,9 +1371,18 @@ export class Parser {
             return true
         }
 
-        // Treat newlines as statement end
+        // Treat newlines as statement end UNLESS the next line starts with a continuation operator
         const currentToken = this.current()
-        return currentToken.line > this.lastTokenLine
+        if (currentToken.line > this.lastTokenLine) {
+            // Check if this is a continuation operator (., [, etc.)
+            const continuationOperators = [".", "["]
+            if (continuationOperators.includes(currentToken.value)) {
+                return false // Continue parsing, this is a multiline expression
+            }
+            return true // This is a statement end
+        }
+
+        return false
     }
 
     private consumeStatementEnd(): void {

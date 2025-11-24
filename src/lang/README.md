@@ -18,6 +18,10 @@ This directory contains the implementation of a Domain-Specific Language (DSL) f
 
     -   Use `map`, `filter`, and `reduce` for iterating over data.
 
+-   **Algebraic Data Types (ADTs)**: Define sum types with variants using the `type Name := | Variant1 [...] | Variant2 [...]` syntax. Each variant can have named fields.
+
+-   **Pattern Matching with Captures**: Match on ADT variants and extract values using the `?name` syntax for binding captures. Supports nested patterns and wildcard `?` for catch-all cases.
+
 -   **Error Handling**: Result and Option types for safe error handling and nullability.
 
 -   **Operator Overloading**: Operators can be overloaded for custom types.
@@ -27,20 +31,22 @@ This directory contains the implementation of a Domain-Specific Language (DSL) f
 #### Basic Example
 
 ```dsl
-data := load "data.csv"
-filteredData := data.filter | _.age > 30 |
-result := filteredData.mapColumn "age" { _ * 2 }
-print result
+arr := [1, 2, 3, 4, 5, 6]
+result := arr
+  .map { x | x * 2 }
+  .filter { x | x > 5 }
+
+print result  # Outputs: [ 6, 8, 10, 12 ]
 ```
 
 #### Functions
 
 ```dsl
-fn square x: Int :=
+fn square x :=
     x * x
 
-fn square x: Float :=
-    x * x
+fn cube x :=
+    x * x * x
 
 result := square 5
 print result  # Outputs: 25
@@ -49,10 +55,14 @@ print result  # Outputs: 25
 #### Closures
 
 ```dsl
-squareFn := { x: Int | x * x }
+squareFn := { x | x * x }
 
-add := { a: Int, b: Int | a + b }
-concat := { a: String, b: String | a + b }
+add := { a, b | a + b }
+concat := { a, b | a + b }
+
+print squareFn 5          # Outputs: 25
+print add(3, 4)           # Outputs: 7
+print concat("a", "b")    # Outputs: ab
 ```
 
 ## Example Implementation
@@ -65,7 +75,49 @@ The DSL is implemented in TypeScript within the Datasheet application. The core 
 -   **Type Checker**: (Future) Ensures type safety and resolves types at compile time
 -   **Standard Library**: Provides built-in functions for data manipulation
 
-## CLI Usage
+## Pattern Matching System
+
+The DSL supports a powerful pattern matching system with algebraic data types (ADTs):
+
+### ADT Syntax
+
+Define a type with multiple variants:
+
+```dsl
+type TypeName :=
+  | VariantA
+  | VariantB [ field1: Type, field2: Type ]
+  | VariantC [ field: Type ]
+```
+
+### Pattern Capture Syntax
+
+The `?name` syntax binds matched values to variables:
+
+-   `?varName` - Capture a value and bind it to `varName`
+-   `fieldName: ?varName` - Match a field and capture its value
+-   `?varName [ nested: ?pattern ]` - Capture with nested pattern matching
+-   `?` - Wildcard that matches anything without binding
+
+### Match Expression Syntax
+
+```dsl
+match value {
+  Pattern1 => expression1;
+  Pattern2 => expression2;
+  ? => default_expression
+}
+```
+
+### Assignment Pattern Matching
+
+Extract values from ADT instances in assignments:
+
+```dsl
+PatternName [ field: ?varName ] := expression
+```
+
+All captured variables are bound in the current scope.
 
 A command-line interface is provided for debugging and testing the language components:
 
@@ -105,7 +157,7 @@ All modes support reading from stdin with the `-` argument:
 
 ```bash
 echo "1 + 2" | bun run src/lang/cli.ts --eval -c -
-echo "fn factorial n := match n: 0 => 1; n => n" | bun run src/lang/cli.ts --ast -c -
+echo "type Result := | Ok [value: String] | Err [message: String]" | bun run src/lang/cli.ts --ast -c -
 ```
 
 ## Interpreter Features
@@ -121,7 +173,12 @@ The interpreter supports:
 -   **Arrays**: `[1, 2, 3]` with methods like `.join()`, `.map()`, `.filter()`, `.reduce()`
 -   **Objects**: Key-value pairs
 -   **Blocks**: Anonymous code blocks with optional parameters
--   **Match expressions**: Pattern matching with `match value: pattern => result`
+-   **Method chaining**: Chain method calls across multiple lines (e.g., `arr.map { ... }.filter { ... }`)
+-   **Match expressions**: Pattern matching with `match value { pattern => body; ... }`
+-   **Brace-delimited match blocks**: Multiple arms separated by semicolons within braces
+-   **Wildcard patterns**: Use `?` for catch-all patterns that match anything
+-   **Capture patterns**: Use `?name` to bind matched values to variables
+-   **Nested patterns**: Combine captures with nested structures for deep value extraction
 -   **Built-in functions**: `print`, `add`, `sub`, `mul`, `div`, `len`, `type`
 
 ## Example Programs
@@ -150,13 +207,87 @@ arr.join(",")
 # Result: "1,2,3,4,5"
 ```
 
-### Pattern Matching
+### Method Chaining
+
+Chain multiple method calls across lines for readable data transformations:
 
 ```dsl
-match 5:
-  0 => "zero"
-  1 => "one"
-# Throws error: No matching pattern found
+result := [1, 2, 3, 4, 5, 6]
+  .map { x | x * 2 }
+  .filter { x | x > 5 }
+
+print result
+# Result: [ 6, 8, 10, 12 ]
+```
+
+### Pattern Matching
+
+#### Basic Pattern Matching on ADT Variants
+
+```dsl
+type Result := | Ok [ value: String ] | Err [ message: String ]
+
+result := Ok [ value: "success" ]
+
+match result {
+  Ok [ value: ?v ] => print("Success: " + v)
+  Err [ message: ?msg ] => print("Error: " + msg)
+  ? => print("Unknown")
+}
+# Outputs: Success: success
+```
+
+#### Pattern Matching in Assignments
+
+Extract values from ADT instances using pattern binding:
+
+```dsl
+type Option := | Some [ value: String ] | None
+
+wrapped := Some [ value: "hello" ]
+Some [ value: ?msg ] := wrapped
+
+print(msg)
+# Outputs: hello
+```
+
+#### Nested Pattern Matching
+
+Match deeply nested structures in a single pattern:
+
+```dsl
+type Response := | Success [ result: Result ] | Failed
+
+response := Success [ result: Ok [ value: "data" ] ]
+
+match response {
+  Success [ result: Ok [ value: ?data ] ] => print("Got: " + data)
+  Success [ result: Err [ message: ?err ] ] => print("Error: " + err)
+  Failed => print("Failed")
+}
+# Outputs: Got: data
+```
+
+#### Algebraic Data Types (ADTs)
+
+Define custom types with multiple variants:
+
+```dsl
+type Result := | Ok [ value: String ] | Err [ message: String ]
+type Option := | Some [ value: String ] | None
+type Color := | Red | Green | Blue
+
+# Construct instances
+ok_result := Ok [ value: "data" ]
+error_result := Err [ message: "something went wrong" ]
+some_val := Some [ value: "wrapped" ]
+red := Red
+
+# Pattern match on variants
+match ok_result {
+  Ok [ value: ?v ] => print(v)
+  Err [ message: ?m ] => print(m)
+}
 ```
 
 ### Logical Operators
