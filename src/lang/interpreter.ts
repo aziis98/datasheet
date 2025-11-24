@@ -9,7 +9,7 @@ import type {
     MatchExpression,
     MethodCall,
     UnaryOp,
-} from "./parser"
+} from "./types"
 
 export type Value =
     | number

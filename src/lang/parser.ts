@@ -1,14 +1,7 @@
 import { Lexer } from "./lexer"
-import type {
-    ADTVariant,
-    ASTNode,
-    FunctionParameter,
-    Literal,
-    PatternArm,
-    Token,
-    TokenType,
-    TypeInstance,
-} from "./types"
+import { PrecedenceTable } from "./precedence"
+import { TokenScanner } from "./scanner"
+import type { ADTVariant, ASTNode, FunctionParameter, Literal, PatternArm, TypeInstance } from "./types"
 
 // Operator precedence levels (lower index = lower precedence)
 const PRECEDENCE_LEVELS = [
@@ -25,38 +18,25 @@ const PRECEDENCE_LEVELS = [
     ["("], // Call precedence
 ]
 
-// Build precedence table from levels
-const PRECEDENCE: Record<string, number> = {}
-PRECEDENCE_LEVELS.forEach((operators, index) => {
-    const precedenceValue = (index + 1) * 10
-    operators.forEach(op => {
-        PRECEDENCE[op] = precedenceValue
-    })
-})
-
-// export interface Token {
-//     type: TokenType
-//     value: string
-//     line: number
-//     column: number
-// }
-
-// export type TokenType = "number" | "string" | "identifier" | "keyword" | "operator" | "punctuation" | "eof"
+type PrefixParser = () => ASTNode
+type InfixParser = (left: ASTNode) => ASTNode
 
 export class Parser {
-    private tokens: Token[]
-    private pos = 0
-    private prefixParsers: Record<string, () => ASTNode> = {}
-    private infixParsers: Record<string, (left: ASTNode) => ASTNode> = {}
+    private scanner: TokenScanner
+    private precedence: PrecedenceTable
+    private prefixParsers: Record<string, PrefixParser> = {}
+    private infixParsers: Record<string, InfixParser> = {}
 
     constructor(input: string) {
-        this.tokens = new Lexer(input).tokenize()
+        const tokens = new Lexer(input).tokenize()
+        this.scanner = new TokenScanner(tokens)
+        this.precedence = new PrecedenceTable(PRECEDENCE_LEVELS)
         this.registerRules()
     }
 
     public parse(): ASTNode[] {
         const statements: ASTNode[] = []
-        while (!this.isAtEnd()) {
+        while (!this.scanner.isAtEnd()) {
             statements.push(this.parseStatement())
         }
         return statements
@@ -68,69 +48,75 @@ export class Parser {
 
     private registerRules() {
         // Literals & Atoms
-        ;["number", "string", "true", "false"].forEach(t => this.prefix(t, () => this.parseLiteral()))
-        this.prefix("identifier", () => this.parseIdentifierOrCall())
+        ;["number", "string", "true", "false"].forEach(t => (this.prefixParsers[t] = () => this.parseLiteral()))
+        this.prefixParsers["identifier"] = () => this.parseIdentifierOrCall()
 
         // Groups & Structures
-        this.prefix("(", () => this.parseGroup())
-        this.prefix("[", () => this.parseArray())
-        this.prefix("{", () => this.parseBlock())
+        this.prefixParsers["("] = () => this.parseGroup()
+        this.prefixParsers["["] = () => this.parseArray()
+        this.prefixParsers["{"] = () => this.parseBlock()
 
         // Keywords
-        this.prefix("fn", () => this.parseFn())
-        this.prefix("type", () => this.parseTypeDecl(false))
-        this.prefix("abstract", () => this.parseTypeDecl(true))
-        this.prefix("match", () => this.parseMatch())
-        this.prefix("#", () => ({ type: "quotedForm", expression: (this.advance(), this.parseExpr(100)) }))
+        this.prefixParsers["fn"] = () => this.parseFn()
+        this.prefixParsers["type"] = () => this.parseTypeDecl(false)
+        this.prefixParsers["abstract"] = () => this.parseTypeDecl(true)
+        this.prefixParsers["match"] = () => this.parseMatch()
+        this.prefixParsers["#"] = () => ({
+            type: "quotedForm",
+            expression: (this.scanner.advance(), this.parseExpr(100)),
+        })
 
         // Prefix Ops
-        ;["-", "!"].forEach(op =>
-            this.prefix(op, () => ({ type: "unaryOp", operator: op, operand: (this.advance(), this.parseExpr(50)) }))
+        ;["-", "!"].forEach(
+            op =>
+                (this.prefixParsers[op] = () => ({
+                    type: "unaryOp",
+                    operator: op,
+                    operand: (this.scanner.advance(), this.parseExpr(50)),
+                }))
         )
 
         // Infix Ops
-        ;["+", "-", "*", "/", "%", "^", "==", "!=", "<", ">", "<=", ">=", "&&", "||"].forEach(op =>
-            this.infix(op, left => ({
-                type: "binaryOp",
-                operator: op,
-                left,
-                right: this.parseExpr(PRECEDENCE[op] + 1),
-            }))
+        ;["+", "-", "*", "/", "%", "^", "==", "!=", "<", ">", "<=", ">=", "&&", "||"].forEach(
+            op =>
+                (this.infixParsers[op] = (left: ASTNode) => ({
+                    type: "binaryOp",
+                    operator: op,
+                    left,
+                    right: this.parseExpr(this.precedence.getPrecedence(op) + 1),
+                }))
         )
 
         // Special Infix
-        this.infix(":=", left => this.parseAssignment(left))
-        this.infix(":", left => this.parseKeyValue(left))
-        this.infix(".", left => this.parseDotAccess(left))
-        this.infix("[", left => this.parseTypeInstance(left))
-    }
-
-    private prefix(key: string, fn: () => ASTNode) {
-        this.prefixParsers[key] = fn
-    }
-    private infix(key: string, fn: (left: ASTNode) => ASTNode) {
-        this.infixParsers[key] = fn
+        this.infixParsers[":="] = (left: ASTNode) => this.parseAssignment(left)
+        this.infixParsers[":"] = (left: ASTNode) => this.parseKeyValue(left)
+        this.infixParsers["."] = (left: ASTNode) => this.parseDotAccess(left)
+        this.infixParsers["["] = (left: ASTNode) => this.parseTypeInstance(left)
     }
 
     private parseStatement(): ASTNode {
         const stmt = this.parseExpr(0)
-        if (this.check(";")) this.advance()
+        if (this.scanner.check(";")) this.scanner.advance()
         return stmt
     }
 
     private parseExpr(precedence: number): ASTNode {
-        const token = this.current()
+        const token = this.scanner.current()
         const parser = this.prefixParsers[token.type] || this.prefixParsers[token.value]
 
-        if (!parser) throw this.error(`Unexpected token: ${token.value}`)
+        if (!parser) throw this.scanner.error(`Unexpected token: ${token.value}`)
 
         let left = parser()
 
-        while (!this.isAtEnd() && !this.isStatementEnd() && this.getPrecedence() > precedence) {
-            const op = this.current().value
+        while (
+            !this.scanner.isAtEnd() &&
+            !this.scanner.isStatementEnd() &&
+            this.precedence.getPrecedence(this.scanner.current().value) > precedence
+        ) {
+            const op = this.scanner.current().value
             const infix = this.infixParsers[op]
             if (!infix) break
-            this.advance()
+            this.scanner.advance()
             left = infix(left)
         }
         return left
@@ -141,15 +127,15 @@ export class Parser {
     // =========================
 
     private parseLiteral(): Literal {
-        const { type, value } = this.advance()
+        const { type, value } = this.scanner.advance()
         if (type === "number") return { type: "literal", valueType: "number", value: parseFloat(value) }
         if (type === "string") return { type: "literal", valueType: "string", value }
         return { type: "literal", valueType: "boolean", value: value === "true" }
     }
 
     private parseIdentifierOrCall(): ASTNode {
-        const name = this.advance().value
-        if (this.check("(")) {
+        const name = this.scanner.advance().value
+        if (this.scanner.check("(")) {
             const args = this.parseList("(", ")", ",", () => this.parseExpr(0))
             return { type: "methodCall", object: { type: "identifier", name: "global" }, method: name, arguments: args }
         }
@@ -157,17 +143,17 @@ export class Parser {
     }
 
     private parseGroup(): ASTNode {
-        this.consume("(")
+        this.scanner.consume("(")
         const expr = this.parseExpr(0)
-        this.consume(")")
+        this.scanner.consume(")")
         return expr
     }
 
     private parseArray(): ASTNode {
         const elements = this.parseList("[", "]", ",", () => {
-            if (this.checkType("identifier") && this.peek()?.value === ":") {
-                const key = this.advance().value
-                this.consume(":")
+            if (this.scanner.checkType("identifier") && this.scanner.peek()?.value === ":") {
+                const key = this.scanner.advance().value
+                this.scanner.consume(":")
                 return {
                     type: "typeInstance",
                     typeName: "KeyValue",
@@ -200,75 +186,75 @@ export class Parser {
     }
 
     private parseBlock(): ASTNode {
-        this.consume("{")
+        this.scanner.consume("{")
         let parameters: string[] | undefined
 
-        const start = this.pos
-        if (this.checkType("identifier")) {
+        const start = this.scanner.createCheckpoint()
+        if (this.scanner.checkType("identifier")) {
             const potentialParams = []
-            while (this.checkType("identifier") || this.check(",")) {
-                if (this.checkType("identifier")) {
-                    potentialParams.push(this.advance().value)
-                    if (this.check(":")) {
-                        this.advance()
-                        this.advance()
+            while (this.scanner.checkType("identifier") || this.scanner.check(",")) {
+                if (this.scanner.checkType("identifier")) {
+                    potentialParams.push(this.scanner.advance().value)
+                    if (this.scanner.check(":")) {
+                        this.scanner.advance()
+                        this.scanner.advance()
                     }
                 } else {
-                    this.advance()
+                    this.scanner.advance()
                 }
             }
-            if (this.check("|")) {
-                this.advance()
+            if (this.scanner.check("|")) {
+                this.scanner.advance()
                 parameters = potentialParams
             } else {
-                this.pos = start
+                this.scanner.restoreCheckpoint(start)
             }
         }
 
         const body: ASTNode[] = []
-        while (!this.check("}") && !this.isAtEnd()) {
+        while (!this.scanner.check("}") && !this.scanner.isAtEnd()) {
             body.push(this.parseStatement())
         }
-        this.consume("}")
+        this.scanner.consume("}")
         return { type: "block", parameters, body }
     }
 
     private parseFn(): ASTNode {
-        this.advance() // fn
-        const name = this.consumeType("identifier").value
+        this.scanner.advance() // fn
+        const name = this.scanner.consumeType("identifier").value
         const parameters: FunctionParameter[] = []
 
-        const hasParens = this.match("(")
-        while (!this.check(hasParens ? ")" : ":=") && !this.isAtEnd()) {
-            const pName = this.consumeType("identifier").value
-            const typeAnnotation = this.match(":") ? this.parseType() : undefined
+        const hasParens = this.scanner.match("(")
+        while (!this.scanner.check(hasParens ? ")" : ":=") && !this.scanner.isAtEnd()) {
+            const pName = this.scanner.consumeType("identifier").value
+            const typeAnnotation = this.scanner.match(":") ? this.parseType() : undefined
             parameters.push({ type: "parameter", name: pName, typeAnnotation })
-            this.match(",")
+            this.scanner.match(",")
         }
-        if (hasParens) this.consume(")")
-        this.consume(":=")
+        if (hasParens) this.scanner.consume(")")
+        this.scanner.consume(":=")
         return { type: "functionDeclaration", name, parameters, body: this.parseExpr(0) }
     }
 
     private parseTypeDecl(isAbstract: boolean): ASTNode {
-        if (isAbstract) this.advance() // abstract
-        this.consume("type")
-        const name = this.consumeType("identifier").value
-        const parent = this.match("<:") ? this.consumeType("identifier").value : undefined
+        if (isAbstract) this.scanner.advance() // abstract
+        this.scanner.consume("type")
+        const name = this.scanner.consumeType("identifier").value
+        const parent = this.scanner.match("<:") ? this.scanner.consumeType("identifier").value : undefined
 
-        if (this.match(":=")) {
+        if (this.scanner.match(":=")) {
             // ADT Variants
             const variants: ADTVariant[] = []
-            while (!this.isAtEnd()) {
-                if (!this.check("|")) break
-                this.advance() // consume |
+            while (!this.scanner.isAtEnd()) {
+                if (!this.scanner.check("|")) break
+                this.scanner.advance() // consume |
 
-                const vName = this.consumeType("identifier").value
+                const vName = this.scanner.consumeType("identifier").value
                 let vFields: { name: string; fieldType: ASTNode }[] = []
-                if (this.check("[")) {
+                if (this.scanner.check("[")) {
                     vFields = this.parseList("[", "]", ",", () => {
-                        const fName = this.consumeType("identifier").value
-                        this.consume(":")
+                        const fName = this.scanner.consumeType("identifier").value
+                        this.scanner.consume(":")
                         return { name: fName, fieldType: this.parseType() }
                     })
                 }
@@ -279,56 +265,56 @@ export class Parser {
 
         // Record Type
         const fields: any[] = []
-        if (this.match(":")) {
-            while (this.checkType("identifier")) {
-                const fName = this.advance().value
-                this.consume(":")
+        if (this.scanner.match(":")) {
+            while (this.scanner.checkType("identifier")) {
+                const fName = this.scanner.advance().value
+                this.scanner.consume(":")
                 fields.push({ name: fName, fieldType: this.parseType() })
-                if (!this.match(",")) break
+                if (!this.scanner.match(",")) break
             }
         }
         return { type: "typeDeclaration", name, isAbstract, parent, fields }
     }
 
     private parseMatch(): ASTNode {
-        this.advance() // match
+        this.scanner.advance() // match
         const value = this.parseExpr(0)
-        this.consume("{")
+        this.scanner.consume("{")
         const arms: PatternArm[] = []
 
-        while (!this.check("}") && !this.isAtEnd()) {
+        while (!this.scanner.check("}") && !this.scanner.isAtEnd()) {
             const pattern = this.parseMatchPattern()
-            this.consume("=>")
+            this.scanner.consume("=>")
             arms.push({ type: "patternArm", pattern, body: this.parseExpr(0) })
-            if (!this.check("}")) this.match(",") || this.match(";")
+            if (!this.scanner.check("}")) this.scanner.match(",") || this.scanner.match(";")
         }
-        this.consume("}")
+        this.scanner.consume("}")
         return { type: "matchExpression", value, arms }
     }
 
     private parseMatchPattern(): ASTNode {
         // Capture pattern
-        if (this.check("?")) {
+        if (this.scanner.check("?")) {
             return this.parseCapture()
         }
 
         // Check if it's an identifier (could be a type constructor or simple identifier)
-        if (this.checkType("identifier")) {
-            const name = this.advance().value
+        if (this.scanner.checkType("identifier")) {
+            const name = this.scanner.advance().value
 
             // Type instance pattern: Name[field: pattern, ...]
-            if (this.check("[")) {
+            if (this.scanner.check("[")) {
                 const fields = this.parseList("[", "]", ",", () => {
                     let key: string
-                    if (this.checkType("string")) key = this.advance().value
-                    else key = this.consumeType("identifier").value
+                    if (this.scanner.checkType("string")) key = this.scanner.advance().value
+                    else key = this.scanner.consumeType("identifier").value
 
                     let value: ASTNode
-                    if (!this.check(":")) {
+                    if (!this.scanner.check(":")) {
                         value = { type: "capturePattern", name: key }
                     } else {
-                        this.consume(":")
-                        if (this.check("?")) value = this.parseCapture()
+                        this.scanner.consume(":")
+                        if (this.scanner.check("?")) value = this.parseCapture()
                         else value = this.parseMatchPattern()
                     }
                     return { key, value }
@@ -345,9 +331,9 @@ export class Parser {
     }
 
     private parseCapture(): ASTNode {
-        this.consume("?")
-        const name = this.checkType("identifier") ? this.advance().value : "?"
-        const pattern = this.check("[") ? this.parseMatchPattern() : undefined
+        this.scanner.consume("?")
+        const name = this.scanner.checkType("identifier") ? this.scanner.advance().value : "?"
+        const pattern = this.scanner.check("[") ? this.parseMatchPattern() : undefined
         return { type: "capturePattern", name, pattern }
     }
 
@@ -362,7 +348,7 @@ export class Parser {
         const isValidTarget = left.type === "identifier" || isPattern
 
         if (!isValidTarget) {
-            throw this.error(`Invalid assignment target: ${left.type}`)
+            throw this.scanner.error(`Invalid assignment target: ${left.type}`)
         }
 
         const variable = left.type === "identifier" ? (left as any).name : "_match"
@@ -377,18 +363,18 @@ export class Parser {
             typeName: "KeyValue",
             fields: [
                 { key: "key", value: left },
-                { key: "value", value: this.parseExpr(PRECEDENCE[":"] + 1) },
+                { key: "value", value: this.parseExpr(this.precedence.getPrecedence(":") + 1) },
             ],
         }
     }
 
     private parseDotAccess(left: ASTNode): ASTNode {
-        const field = this.consumeType("identifier").value
-        if (this.check("(")) {
+        const field = this.scanner.consumeType("identifier").value
+        if (this.scanner.check("(")) {
             const args = this.parseList("(", ")", ",", () => this.parseExpr(0))
             return { type: "methodCall", object: left, method: field, arguments: args }
         }
-        if (this.check("{")) {
+        if (this.scanner.check("{")) {
             return { type: "methodCall", object: left, method: field, arguments: [this.parseBlock()] }
         }
         return { type: "fieldAccess", object: left, field }
@@ -397,9 +383,11 @@ export class Parser {
     private parseTypeInstance(left: ASTNode): ASTNode {
         const typeName = (left as any).name
         const fields = this.parseList(null, "]", ",", () => {
-            let key = this.checkType("string") ? this.advance().value : this.consumeType("identifier").value
-            this.consume(":")
-            const val = this.check("?") ? this.parseCapture() : this.parseExpr(0)
+            let key = this.scanner.checkType("string")
+                ? this.scanner.advance().value
+                : this.scanner.consumeType("identifier").value
+            this.scanner.consume(":")
+            const val = this.scanner.check("?") ? this.parseCapture() : this.parseExpr(0)
             return { key, value: val }
         })
         return { type: "typeInstance", typeName, fields }
@@ -410,8 +398,8 @@ export class Parser {
     // =========================
 
     private parseType(): ASTNode {
-        const name = this.consumeType("identifier").value
-        if (this.match("<")) {
+        const name = this.scanner.consumeType("identifier").value
+        if (this.scanner.match("<")) {
             const params = this.parseList(null, ">", ",", () => this.parseType())
             return { type: "typeInstance", typeName: name, fields: params.map((p, i) => ({ key: `p${i}`, value: p })) }
         }
@@ -419,56 +407,14 @@ export class Parser {
     }
 
     private parseList<T>(start: string | null, end: string, sep: string, fn: () => T): T[] {
-        if (start) this.consume(start)
+        if (start) this.scanner.consume(start)
         const items: T[] = []
-        while (!this.check(end) && !this.isAtEnd()) {
+        while (!this.scanner.check(end) && !this.scanner.isAtEnd()) {
             items.push(fn())
-            if (this.check(sep)) this.advance()
+            if (this.scanner.check(sep)) this.scanner.advance()
         }
-        this.consume(end)
+        this.scanner.consume(end)
         return items
-    }
-
-    private current(): Token {
-        return this.tokens[this.pos] || { type: "eof", value: "", line: 0, column: 0 }
-    }
-
-    private peek() {
-        return this.tokens[this.pos + 1]
-    }
-
-    private isAtEnd() {
-        return this.current().type === "eof"
-    }
-
-    private advance() {
-        return this.tokens[this.pos++] || this.current()
-    }
-
-    private check(val: string) {
-        return !this.isAtEnd() && this.current().value === val
-    }
-
-    private checkType(t: TokenType) {
-        return !this.isAtEnd() && this.current().type === t
-    }
-
-    private match(val: string) {
-        if (this.check(val)) {
-            this.advance()
-            return true
-        }
-        return false
-    }
-
-    private consume(val: string) {
-        if (!this.check(val)) throw this.error(`Expected '${val}'`)
-        return this.advance()
-    }
-
-    private consumeType(t: TokenType) {
-        if (!this.checkType(t)) throw this.error(`Expected ${t}`)
-        return this.advance()
     }
 
     private lit(s: string): Literal {
@@ -480,23 +426,6 @@ export class Parser {
             n.type === "capturePattern" ||
             (n.type === "typeInstance" && (n as TypeInstance).fields.some(f => this.isCapture(f.value)))
         )
-    }
-
-    private getPrecedence() {
-        return PRECEDENCE[this.current().value] || 0
-    }
-
-    private isStatementEnd() {
-        if (this.check(";") || this.check("}") || this.check("]")) return true
-        if (this.pos > 0 && this.tokens[this.pos - 1].line < this.current().line) {
-            return ![".", "[", "(", ",", "+", "-", "*", "/", "&&", "||", "=>", "|"].includes(this.current().value)
-        }
-        return false
-    }
-
-    private error(msg: string) {
-        const t = this.current()
-        return new Error(`${msg} at ${t.line}:${t.column}`)
     }
 }
 
