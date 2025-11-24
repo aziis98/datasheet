@@ -1,206 +1,310 @@
 /**
- * Immutable Multiple Dispatch Registry
+ * Generic Function Multiple Dispatch
  *
- * Provides a data structure for registering and dispatching methods based on argument signatures.
- * Uses naive sequential checking to find the best matching method for given arguments.
- * All operations return new copies to maintain immutability.
+ * Implements Julia-style multiple dispatch with:
+ * - Type-based method resolution
+ * - Specificity ordering
+ * - Caching for performance
+ * - Ambiguity detection
+ *
+ * Methods are prioritized by specificity: more specific signatures are tried first.
+ * A method is more specific if its signature is a subtype of another signature.
  */
 
-export type Signature = string | number | symbol
-
-export type Method = (...args: any[]) => any
+import { isSubtype, type BaseType, type TypeVar } from "./type-system"
 
 /**
- * Represents a dispatched method with its signature
+ * Represents a method with its type signature and implementation
  */
 export interface MethodEntry {
-    signature: Signature[]
-    method: Method
-    priority: number // Lower values = higher priority
+    typeVars: TypeVar[]
+    signature: BaseType[]
+    implementation: Function
 }
 
 /**
- * Immutable multiple dispatch registry
+ * Unification environment for tracking type variable bindings
  */
-export class MultiDispatch {
-    private readonly entries: readonly MethodEntry[]
+interface UnificationEnv {
+    [key: string]: BaseType
+}
 
-    constructor(entries: MethodEntry[] = []) {
-        this.entries = Object.freeze([...entries])
-    }
+export type Method = {
+    typeVars: TypeVar[]
+    signature: BaseType[]
+    fn: Function
+}
 
-    /**
-     * Register a new method with a signature
-     * Returns a new MultiDispatch instance with the method added
-     */
-    register(...args: [...Signature[], Method]): MultiDispatch {
-        if (args.length < 2) {
-            throw new Error("register requires at least a signature and method")
+export let debug: {
+    cacheHitCallback: ((name: string, argTypes: BaseType[]) => void) | null
+} = {
+    cacheHitCallback: null,
+}
+
+function isMethodApplicable(method: Method, args: BaseType[]): boolean {
+    if (args.length !== method.signature.length) return false
+
+    const env: UnificationEnv = {}
+
+    for (let i = 0; i < args.length; i++) {
+        if (!unify(args[i], method.signature[i], env)) {
+            return false
         }
-
-        const method = args[args.length - 1] as Method
-        const signature = args.slice(0, -1) as Signature[]
-
-        const newEntry: MethodEntry = {
-            signature,
-            method,
-            priority: this.entries.length, // Append has lower priority
-        }
-
-        return new MultiDispatch([...this.entries, newEntry])
     }
+    return true
+}
 
-    /**
-     * Get a method matching the given signature
-     * Uses naive sequential check: iterates through entries to find best match
-     * Returns the first method with matching signature length and type pattern
-     */
-    get(...signature: any[]): Method | undefined {
-        // Sort by priority (lower values first)
-        const sorted = [...this.entries].sort((a, b) => a.priority - b.priority)
+function unify(concrete: BaseType, pattern: BaseType, env: UnificationEnv): boolean {
+    // A. Pattern is a Type Variable (T)
+    if (pattern.kind === "TypeVar") {
+        const tv = pattern as TypeVar
+        // 1. Check constraint
+        if (!isSubtype(concrete, tv.constraint)) return false
 
-        for (const entry of sorted) {
-            if (entry.signature.length !== signature.length) {
-                continue
-            }
-
-            // Check if all signature components match
-            let matches = true
-            for (let i = 0; i < entry.signature.length; i++) {
-                const pattern = entry.signature[i]
-                const arg = signature[i]
-
-                if (!this.matchesPattern(arg, pattern)) {
-                    matches = false
-                    break
-                }
-            }
-
-            if (matches) {
-                return entry.method
-            }
-        }
-
-        return undefined
-    }
-
-    /**
-     * Get all registered methods (snapshot)
-     */
-    getAllMethods(): readonly MethodEntry[] {
-        return this.entries
-    }
-
-    /**
-     * Create a new MultiDispatch with methods removed matching a signature
-     */
-    remove(...signature: Signature[]): MultiDispatch {
-        const filtered = this.entries.filter(entry => {
-            if (entry.signature.length !== signature.length) {
-                return true
-            }
-            return !entry.signature.every((sig, i) => sig === signature[i])
-        })
-
-        return new MultiDispatch([...filtered])
-    }
-
-    /**
-     * Create a new MultiDispatch with all entries replaced
-     */
-    clear(): MultiDispatch {
-        return new MultiDispatch([])
-    }
-
-    /**
-     * Create a copy of this registry
-     */
-    clone(): MultiDispatch {
-        return new MultiDispatch([...this.entries])
-    }
-
-    /**
-     * Check if a method with signature exists
-     */
-    has(...signature: Signature[]): boolean {
-        return this.entries.some(entry => {
-            if (entry.signature.length !== signature.length) {
-                return false
-            }
-            return entry.signature.every((sig, i) => sig === signature[i])
-        })
-    }
-
-    /**
-     * Check if an argument matches a pattern
-     * Patterns can be:
-     * - "*" or "any" for any type
-     * - "number", "string", "boolean", etc. for type checks
-     * - Specific values for exact matches
-     */
-    private matchesPattern(arg: any, pattern: Signature): boolean {
-        // Wildcard patterns
-        if (pattern === "*" || pattern === "any") {
+        // 2. Check existing binding
+        if (tv.name in env) {
+            // Enforce strict equality for consistency (T must be exactly T everywhere)
+            return env[tv.name].id === concrete.id
+        } else {
+            // Bind T to the concrete type
+            env[tv.name] = concrete
             return true
         }
+    }
 
-        // Type patterns
-        if (typeof pattern === "string") {
-            const argType = typeof arg
-            if (
-                pattern === "number" ||
-                pattern === "string" ||
-                pattern === "boolean" ||
-                pattern === "function" ||
-                pattern === "object"
-            ) {
-                if (pattern === "object") {
-                    // Special case: null should not match "object"
-                    return argType === "object" && arg !== null
-                }
-                return argType === pattern
+    // B. Pattern is Parametric (Array[T])
+    if (pattern.kind === "Parametric" && concrete.kind === "Parametric") {
+        const pPattern = pattern as any
+        const pConcrete = concrete as any
+
+        if (pPattern.base !== pConcrete.base) return false
+        if (pPattern.typeArgs.length !== pConcrete.typeArgs.length) return false
+
+        // Recursively unify type arguments
+        for (let i = 0; i < pPattern.typeArgs.length; i++) {
+            if (!unify(pConcrete.typeArgs[i], pPattern.typeArgs[i], env)) {
+                return false
             }
+        }
+        return true
+    }
 
-            // Array pattern
-            if (pattern === "array") {
-                return Array.isArray(arg)
-            }
+    // C. Standard Subtyping
+    return isSubtype(concrete, pattern)
+}
 
-            // Null pattern
-            if (pattern === "null") {
-                return arg === null
-            }
+/**
+ * A method with unification capabilities
+ */
+// class Method {
+//     public readonly typeVars: TypeVar[]
+//     public readonly signature: BaseType[]
+//     public readonly fn: Function
 
-            // Exact value match
-            return arg === pattern
+//     constructor(typeVars: TypeVar[], signature: BaseType[], fn: Function) {
+//         this.typeVars = typeVars
+//         this.signature = signature
+//         this.fn = fn
+//     }
+
+//     /**
+//      * Checks if runtime arguments match this method's signature.
+//      * Handles generic unification (e.g., T must be consistent across all uses).
+//      */
+//     isApplicable(args: BaseType[]): boolean {
+//         if (args.length !== this.signature.length) return false
+
+//         const env: UnificationEnv = {}
+
+//         for (let i = 0; i < args.length; i++) {
+//             if (!this.unify(args[i], this.signature[i], env)) {
+//                 return false
+//             }
+//         }
+//         return true
+//     }
+
+//     /**
+//      * Unifies a concrete argument type with a pattern type from the method signature.
+//      * Handles type variables, parametric types, and standard subtyping.
+//      */
+//     private unify(concrete: BaseType, pattern: BaseType, env: UnificationEnv): boolean {
+//         // A. Pattern is a Type Variable (T)
+//         if (pattern.kind === "TypeVar") {
+//             const tv = pattern as TypeVar
+//             // 1. Check constraint
+//             if (!isSubtype(concrete, tv.constraint)) return false
+
+//             // 2. Check existing binding
+//             if (tv.name in env) {
+//                 // Enforce strict equality for consistency (T must be exactly T everywhere)
+//                 return env[tv.name].id === concrete.id
+//             } else {
+//                 // Bind T to the concrete type
+//                 env[tv.name] = concrete
+//                 return true
+//             }
+//         }
+
+//         // B. Pattern is Parametric (Array<T>)
+//         if (pattern.kind === "Parametric" && concrete.kind === "Parametric") {
+//             const pPattern = pattern as any
+//             const pConcrete = concrete as any
+
+//             if (pPattern.base !== pConcrete.base) return false
+//             if (pPattern.typeArgs.length !== pConcrete.typeArgs.length) return false
+
+//             // Recursively unify type arguments
+//             for (let i = 0; i < pPattern.typeArgs.length; i++) {
+//                 if (!this.unify(pConcrete.typeArgs[i], pPattern.typeArgs[i], env)) {
+//                     return false
+//                 }
+//             }
+//             return true
+//         }
+
+//         // C. Standard Subtyping
+//         return isSubtype(concrete, pattern)
+//     }
+// }
+
+/**
+ * Generic Function dispatcher using multiple dispatch
+ * Resolves method calls based on argument types with specificity ordering
+ */
+export class GenericFunction {
+    public readonly name: string
+    private readonly methods: readonly Method[]
+
+    private readonly cache: Map<string, Method>
+
+    constructor(name: string, methods: readonly Method[] = []) {
+        this.name = name
+        this.methods = methods
+        this.cache = new Map()
+    }
+
+    /**
+     * Add a method to this generic function, returning a new GenericFunction
+     */
+    withMethod(typeVars: TypeVar[], signature: BaseType[], fn: Function): GenericFunction {
+        const newMethods = [...this.methods, { typeVars, signature, fn }]
+        return new GenericFunction(this.name, newMethods)
+    }
+
+    /**
+     * Returns applicable methods for given argument types, sorted by specificity.
+     * Most specific methods come first.
+     */
+    private resolve(argTypes: BaseType[]): readonly Method[] {
+        // Filter applicable methods
+        const applicable = this.methods.filter(m => isMethodApplicable(m, argTypes))
+
+        // Sort by specificity (most specific first)
+        applicable.sort((m1, m2) => this.compareSpecificity(m1, m2))
+
+        return applicable
+    }
+
+    /**
+     * Call the generic function with runtime arguments.
+     * Dispatches to the most specific matching method.
+     *
+     * @throws MethodError if no method matches
+     * @throws MethodAmbiguity if multiple equally specific methods match
+     */
+    call(...args: any[]): any {
+        // 1. Extract runtime types from argument metadata
+        const argTypes = args.map(a => a.__type__)
+        if (argTypes.some(t => !t)) {
+            throw new Error(`Arguments missing __type__ property for ${this.name}`)
         }
 
-        // Exact value match for non-string patterns
-        return arg === pattern
+        // 2. Check cache
+        const cacheKey = argTypes.map(t => t.id).join(",")
+        if (this.cache.has(cacheKey)) {
+            debug.cacheHitCallback?.(this.name, argTypes)
+
+            return this.cache.get(cacheKey)!.fn(...args)
+        }
+
+        // 3. Resolve applicable methods
+        const applicable = this.resolve(argTypes)
+
+        if (applicable.length === 0) {
+            throw new Error(
+                `MethodError: no method matching ${this.name}(${argTypes.map(t => t.toString()).join(", ")})`
+            )
+        }
+
+        const winner = applicable[0]
+
+        // 4. Ambiguity check
+        if (applicable.length > 1) {
+            const runnerUp = applicable[1]
+            const winnerMoreSpecific = this.isMoreSpecific(winner, runnerUp)
+            const runnerMoreSpecific = this.isMoreSpecific(runnerUp, winner)
+
+            if (!winnerMoreSpecific && !runnerMoreSpecific) {
+                throw new Error(
+                    `MethodAmbiguity: ${this.name}(${argTypes
+                        .map(t => t.toString())
+                        .join(", ")}) matches multiple methods equally`
+                )
+            }
+        }
+
+        // 5. Update cache with new entry and execute
+        const newCache = new Map(this.cache)
+        newCache.set(cacheKey, winner)
+
+        // Note: In a truly immutable design, cache updates would return a new instance,
+        // but for performance reasons during execution, we update the cache directly
+        // This is safe since cache is an implementation detail
+        this.cache.set(cacheKey, winner)
+
+        return winner.fn(...args)
+    }
+
+    /**
+     * Compare specificity of two methods for given argument types.
+     * Returns negative if m1 is more specific, positive if m2.
+     */
+    private compareSpecificity(m1: Method, m2: Method): number {
+        const m1Spec = this.isMoreSpecific(m1, m2)
+        const m2Spec = this.isMoreSpecific(m2, m1)
+
+        if (m1Spec && !m2Spec) return -1 // m1 wins (more specific)
+        if (m2Spec && !m1Spec) return 1 // m2 wins (more specific)
+        return 0 // Tie (ambiguous)
+    }
+
+    /**
+     * Check if method m1 is more specific than m2.
+     * m1 is more specific if its signature is a subtype of m2's signature.
+     * i.e., m1 accepts a narrower set of types.
+     */
+    private isMoreSpecific(m1: Method, m2: Method): boolean {
+        for (let i = 0; i < m1.signature.length; i++) {
+            const t1 = m1.signature[i]
+            const t2 = m2.signature[i]
+
+            // If t1 is not a subtype of t2, m1 cannot be more specific
+            if (!isSubtype(t1, t2)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /**
+     * Get all registered methods
+     */
+    getAllMethods(): readonly MethodEntry[] {
+        return this.methods.map(m => ({
+            typeVars: m.typeVars,
+            signature: m.signature,
+            implementation: m.fn,
+        }))
     }
 }
-
-/**
- * Create a new MultiDispatch registry
- */
-export function createMultiDispatch(): MultiDispatch {
-    return new MultiDispatch()
-}
-
-/**
- * Example usage:
- *
- * const dispatch = createMultiDispatch()
- *   .register("number", "number", (a, b) => a + b)
- *   .register("string", "string", (a, b) => a + b)
- *   .register("*", "number", (a, b) => `${a} repeated ${b} times`)
- *
- * const addNumbers = dispatch.get(5, 10)
- * console.log(addNumbers(5, 10)) // 15
- *
- * const addStrings = dispatch.get("hello", "world")
- * console.log(addStrings("hello", "world")) // "helloworld"
- *
- * const repeat = dispatch.get("abc", 3)
- * console.log(repeat("abc", 3)) // "abc repeated 3 times"
- */
