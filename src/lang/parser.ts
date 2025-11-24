@@ -10,28 +10,29 @@ import type {
     TypeInstance,
 } from "./types"
 
-// Precedence Table
-const PRECEDENCE: Record<string, number> = {
-    ":=": 1,
-    "=>": 2,
-    "||": 3,
-    "&&": 4,
-    "==": 5,
-    "!=": 5,
-    "<": 6,
-    ">": 6,
-    "<=": 6,
-    ">=": 6,
-    "+": 10,
-    "-": 10,
-    "*": 20,
-    "/": 20,
-    "%": 20,
-    "^": 30,
-    ".": 40,
-    "[": 40,
-    "(": 50, // Call precedence
-}
+// Operator precedence levels (lower index = lower precedence)
+const PRECEDENCE_LEVELS = [
+    [":="],
+    ["=>"],
+    ["||"],
+    ["&&"],
+    ["==", "!="],
+    ["<", ">", "<=", ">="],
+    ["+", "-"],
+    ["*", "/", "%"],
+    ["^"],
+    [".", "["],
+    ["("], // Call precedence
+]
+
+// Build precedence table from levels
+const PRECEDENCE: Record<string, number> = {}
+PRECEDENCE_LEVELS.forEach((operators, index) => {
+    const precedenceValue = (index + 1) * 10
+    operators.forEach(op => {
+        PRECEDENCE[op] = precedenceValue
+    })
+})
 
 // export interface Token {
 //     type: TokenType
@@ -431,12 +432,15 @@ export class Parser {
     private current(): Token {
         return this.tokens[this.pos] || { type: "eof", value: "", line: 0, column: 0 }
     }
+
     private peek() {
         return this.tokens[this.pos + 1]
     }
+
     private isAtEnd() {
         return this.current().type === "eof"
     }
+
     private advance() {
         return this.tokens[this.pos++] || this.current()
     }
@@ -444,9 +448,11 @@ export class Parser {
     private check(val: string) {
         return !this.isAtEnd() && this.current().value === val
     }
+
     private checkType(t: TokenType) {
         return !this.isAtEnd() && this.current().type === t
     }
+
     private match(val: string) {
         if (this.check(val)) {
             this.advance()
@@ -459,13 +465,16 @@ export class Parser {
         if (!this.check(val)) throw this.error(`Expected '${val}'`)
         return this.advance()
     }
+
     private consumeType(t: TokenType) {
         if (!this.checkType(t)) throw this.error(`Expected ${t}`)
         return this.advance()
     }
+
     private lit(s: string): Literal {
         return { type: "literal", valueType: "string", value: s }
     }
+
     private isCapture(n: ASTNode): boolean {
         return (
             n.type === "capturePattern" ||
@@ -476,6 +485,7 @@ export class Parser {
     private getPrecedence() {
         return PRECEDENCE[this.current().value] || 0
     }
+
     private isStatementEnd() {
         if (this.check(";") || this.check("}") || this.check("]")) return true
         if (this.pos > 0 && this.tokens[this.pos - 1].line < this.current().line) {
@@ -483,6 +493,7 @@ export class Parser {
         }
         return false
     }
+
     private error(msg: string) {
         const t = this.current()
         return new Error(`${msg} at ${t.line}:${t.column}`)
