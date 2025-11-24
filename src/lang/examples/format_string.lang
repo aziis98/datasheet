@@ -1,0 +1,3 @@
+// String formatting example
+foo := "hello"
+foo.format("foo = {}")

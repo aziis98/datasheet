@@ -1,0 +1,4 @@
+// String concatenation and operations
+greeting := "Hello"
+name := "World"
+greeting + ", " + name + "!"

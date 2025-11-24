@@ -1,0 +1,31 @@
+// Algebraic Data Types (ADTs) - Sum Types in the Datasheet DSL
+// ADTs allow you to define type-safe enums with associated data
+
+// Example 1: User type with three variants
+type User := 
+| Admin [ name: String ] 
+| Basic [ name: String, age: Int ] 
+| Anonymous
+
+// Create instances of each variant
+admin := Admin("Alice")
+basic := Basic("Bob", 30)
+anon := Anonymous()
+
+// Example 2: Result type for error handling with multiline match
+type Result :=
+| Ok [ value: String ]
+| Err [ message: String ]
+
+// Handler function using brace-delimited match with wildcard
+handler := { result |
+  match result {
+    Ok => "✓ Success: " + result.value
+    Err => "✗ Failed: " + result.message
+  }
+}
+
+// Test the handler
+handler(Ok("operation completed"))
+
+

@@ -1,0 +1,82 @@
+// Pattern Matching with Capture Bindings
+// Demonstrates the ?name syntax for capturing values in match expressions and assignments
+
+// Define an Option type
+type Option := | Some [ value: String ] | None
+
+// Define a Result type  
+type Result := | Ok [ data: String ] | Err [ message: String ]
+
+// ============================================================================
+// 1. Simple Pattern Matching with Captures in Match Expressions
+// ============================================================================
+
+option := Some [ value: "hello" ]
+
+match option {
+  Some [ value: ?v ] => print("Got value: " + v)
+  None => print("No value")
+}
+
+// ============================================================================
+// 2. Pattern Matching in Assignments
+// ============================================================================
+
+result := Ok [ data: "important info" ]
+
+// Extract value from result using pattern matching assignment
+Ok [ data: ?info ] := result
+
+print("Extracted info: " + info)
+
+// ============================================================================
+// 3. Multiple Patterns in Match - Same Syntax Works
+// ============================================================================
+
+value := Err [ message: "something failed" ]
+
+match value {
+  Ok [ data: ?d ] => print("Success: " + d)
+  Err [ message: ?msg ] => print("Error: " + msg)
+  ? => print("Unknown")
+}
+
+// ============================================================================
+// 4. Nested Pattern Matching
+// ============================================================================
+
+type Response := | Success [ result: Result ] | Failed
+
+response := Success [ result: Ok [ data: "nested data" ] ]
+
+match response {
+  Success [ result: Ok [ data: ?nested ] ] => print("Nested value: " + nested)
+  Success [ result: Err [ message: ?err ] ] => print("Nested error: " + err)
+  Failed => print("Failed completely")
+}
+
+// ============================================================================
+// 5. Wildcard Patterns (catch-all)
+// ============================================================================
+
+match option {
+  Some [ value: ?v ] => print("Some: " + v)
+  ? => print("Anything else")
+}
+
+// ============================================================================
+// 6. Complex Nested Assignment Pattern
+// ============================================================================
+
+nested_result := Ok [ data: "deep data" ]
+wrapped := Success [ result: nested_result ]
+
+// This shows the full power: extracting deeply nested values
+// When you need just one value from deeply nested structures
+match wrapped {
+  Success [ result: Ok [ data: ?the_data ] ] => {
+    print("Deep extraction: " + the_data)
+  }
+}
+
+print("✓ Pattern matching examples completed!")

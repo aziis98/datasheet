@@ -1,0 +1,3 @@
+// Array formatting with automatic placeholders
+values := [ "Alice", "Bob", "Charlie" ]
+values.format("Users: {}, {}, {}")

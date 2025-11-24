@@ -1,0 +1,4 @@
+// Function definition and invocation
+fn square x: Int := x * x
+
+square 5

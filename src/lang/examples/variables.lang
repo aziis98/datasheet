@@ -1,0 +1,4 @@
+// Variable assignment and usage
+x := 10
+y := 20
+x + y * 2

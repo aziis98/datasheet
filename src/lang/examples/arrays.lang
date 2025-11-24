@@ -1,0 +1,3 @@
+// Working with arrays and map
+nums := [ 1, 2, 3, 4, 5 ]
+nums.map { x: Int | x * 2 }
