@@ -23,6 +23,7 @@ const checkKeyword: TokenTransform = t => (KEYWORDS.has(t.value) ? { ...t, type:
 const PATTERNS: { regex: RegExp; type: TokenType; transform?: TokenTransform }[] = [
     { regex: /^"""[\s\S]*?"""/, type: "string", transform: unescape },
     { regex: /^"(?:\\.|[^"\\])*"/, type: "string", transform: unescape },
+    { regex: /^`[^`]+`/, type: "identifier" }, // Backtick-quoted operators
     { regex: /^(?::=|=>|<:|==|!=|<=|>=|&&|\|\||[+\-*/%^:=<>!&|#])/, type: "operator" },
     { regex: /^\d+(\.\d+)?/, type: "number" },
     { regex: /^[a-zA-Z_][a-zA-Z0-9_]*/, type: "identifier", transform: checkKeyword },

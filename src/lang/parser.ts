@@ -221,7 +221,13 @@ export class Parser {
 
     private parseFn(): ASTNode {
         this.scanner.advance() // fn
-        const name = this.scanner.consumeType("identifier").value
+        let name = this.scanner.consumeType("identifier").value
+
+        // Handle backtick-quoted operator names like `+`
+        if (name.startsWith("`") && name.endsWith("`")) {
+            name = name.slice(1, -1) // Remove backticks
+        }
+
         const parameters: FunctionParameter[] = []
 
         const hasParens = this.scanner.match("(")
@@ -240,6 +246,17 @@ export class Parser {
         if (isAbstract) this.scanner.advance() // abstract
         this.scanner.consume("type")
         const name = this.scanner.consumeType("identifier").value
+
+        // Parse generic type parameters: type Option<T> := ...
+        let typeParams: string[] = []
+        if (this.scanner.match("<")) {
+            while (!this.scanner.check(">") && !this.scanner.isAtEnd()) {
+                typeParams.push(this.scanner.consumeType("identifier").value)
+                if (!this.scanner.match(",")) break
+            }
+            this.scanner.consume(">")
+        }
+
         const parent = this.scanner.match("<:") ? this.scanner.consumeType("identifier").value : undefined
 
         if (this.scanner.match(":=")) {
@@ -260,7 +277,7 @@ export class Parser {
                 }
                 variants.push({ type: "adtVariant", name: vName, fields: vFields })
             }
-            return { type: "typeDeclaration", name, isAbstract, parent, fields: [], variants }
+            return { type: "typeDeclaration", name, isAbstract, parent, typeParams, fields: [], variants }
         }
 
         // Record Type
@@ -273,7 +290,7 @@ export class Parser {
                 if (!this.scanner.match(",")) break
             }
         }
-        return { type: "typeDeclaration", name, isAbstract, parent, fields }
+        return { type: "typeDeclaration", name, isAbstract, parent, typeParams, fields }
     }
 
     private parseMatch(): ASTNode {

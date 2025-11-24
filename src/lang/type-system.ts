@@ -6,9 +6,12 @@
  * 2. Parametric Polymorphism (Generics like Array[T])
  * 3. Multiple Dispatch (f(A, B) vs f(A, C))
  * 4. Runtime Unification (resolving [T] based on arguments)
+ * 5. Algebraic Data Types (ADTs) - Sum types with variants
+ * 6. Structural Types (Structs) - Record types with named fields
+ * 7. Function Types - First-class function signatures
  */
 
-export type TypeKind = "Any" | "Abstract" | "Concrete" | "Parametric" | "TypeVar"
+export type TypeKind = "Any" | "Abstract" | "Concrete" | "Parametric" | "TypeVar" | "ADT" | "Struct" | "Function"
 
 /**
  * Base class for all types in the system
@@ -119,6 +122,80 @@ export class ParametricType extends BaseType {
 export const ANY = new AnyType()
 
 /**
+ * ADT Types - Algebraic Data Types (Sum types)
+ * Represents types like: Option := Some[value: T] | None
+ */
+export class ADTType extends BaseType {
+    public parent: BaseType
+    public typeParams: TypeVar[] // Generic type parameters
+    public variants: Array<{ name: string; fields: Array<{ name: string; type: BaseType }> }>
+
+    constructor(
+        name: string,
+        typeParams: TypeVar[],
+        variants: Array<{ name: string; fields: Array<{ name: string; type: BaseType }> }>,
+        parent: BaseType
+    ) {
+        super(name, "ADT")
+        this.parent = parent
+        this.typeParams = typeParams
+        this.variants = variants
+    }
+
+    toString(): string {
+        const params = this.typeParams.length > 0 ? `[${this.typeParams.map(t => t.name).join(",")}]` : ""
+        return `${this.name}${params}`
+    }
+
+    /**
+     * Get a variant by name
+     */
+    getVariant(name: string) {
+        return this.variants.find(v => v.name === name)
+    }
+}
+
+/**
+ * Struct Types - Record types with named fields
+ * Represents types like: Person: name: String, age: Int
+ */
+export class StructType extends BaseType {
+    public parent: BaseType
+    public fields: Array<{ name: string; type: BaseType }>
+
+    constructor(name: string, fields: Array<{ name: string; type: BaseType }>, parent: BaseType) {
+        super(name, "Struct")
+        this.parent = parent
+        this.fields = fields
+    }
+
+    toString(): string {
+        const fieldStr = this.fields.map(f => `${f.name}: ${f.type.toString()}`).join(", ")
+        return `${this.name}{${fieldStr}}`
+    }
+}
+
+/**
+ * Function Types - Function signatures
+ * Represents types like: (Int, Int) -> Int
+ */
+export class FunctionType extends BaseType {
+    public paramTypes: BaseType[]
+    public returnType: BaseType
+
+    constructor(paramTypes: BaseType[], returnType: BaseType) {
+        const paramStr = paramTypes.map(t => t.toString()).join(", ")
+        super(`(${paramStr}) -> ${returnType.toString()}`, "Function")
+        this.paramTypes = paramTypes
+        this.returnType = returnType
+    }
+
+    toString(): string {
+        return this.name
+    }
+}
+
+/**
  * Subtyping Relation: child <: parent
  *
  * Implements a structural subtyping relation with:
@@ -165,7 +242,53 @@ export function isSubtype(child: BaseType, parent: BaseType): boolean {
         return true
     }
 
-    // 4. Standard Hierarchy Traversal
+    // 4. ADT Types - Nominal matching only
+    // Option[Int] <: Option[Int] (same ADT, same type args)
+    if (child.kind === "ADT" && parent.kind === "ADT") {
+        const adtChild = child as ADTType
+        const adtParent = parent as ADTType
+
+        if (adtChild.id === adtParent.id) return true
+        return isSubtype(adtChild.parent, parent)
+    }
+
+    // 5. Struct Types - Exact structural matching
+    // All fields must match exactly (no width subtyping)
+    if (child.kind === "Struct" && parent.kind === "Struct") {
+        const structChild = child as StructType
+        const structParent = parent as StructType
+
+        if (structChild.fields.length !== structParent.fields.length) return false
+
+        // Check all fields match by name and type
+        for (const parentField of structParent.fields) {
+            const childField = structChild.fields.find(f => f.name === parentField.name)
+            if (!childField) return false
+            if (!isSubtype(childField.type, parentField.type)) return false
+        }
+        return true
+    }
+
+    // 6. Function Types - Contravariant in parameters, covariant in return
+    // (A -> B) <: (C -> D) if C <: A and B <: D
+    if (child.kind === "Function" && parent.kind === "Function") {
+        const funcChild = child as FunctionType
+        const funcParent = parent as FunctionType
+
+        if (funcChild.paramTypes.length !== funcParent.paramTypes.length) return false
+
+        // Parameters are contravariant
+        for (let i = 0; i < funcChild.paramTypes.length; i++) {
+            if (!isSubtype(funcParent.paramTypes[i], funcChild.paramTypes[i])) {
+                return false
+            }
+        }
+
+        // Return type is covariant
+        return isSubtype(funcChild.returnType, funcParent.returnType)
+    }
+
+    // 7. Standard Hierarchy Traversal
     // For concrete and abstract types, traverse up the parent chain
     if ("parent" in child) {
         return isSubtype((child as any).parent, parent)

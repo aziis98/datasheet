@@ -1,3 +1,10 @@
+import type { BaseType } from "./type-system"
+
+export type RuntimeValue = {
+    value: any
+    __type__: BaseType
+}
+
 export type ASTNode =
     | Literal
     | Identifier
@@ -76,6 +83,7 @@ export type TypeDeclaration = {
     type: "typeDeclaration"
     name: string
     isAbstract: boolean
+    typeParams?: string[]
     parent?: string
     fields: Array<{ name: string; fieldType: ASTNode }>
     variants?: ADTVariant[]
