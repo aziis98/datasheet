@@ -135,11 +135,92 @@ export class Parser {
 
     private parseIdentifierOrCall(): ASTNode {
         const name = this.scanner.advance().value
+
+        // Check for parenthesized function call: foo(args)
         if (this.scanner.check("(")) {
             const args = this.parseList("(", ")", ",", () => this.parseExpr(0))
             return { type: "methodCall", object: { type: "identifier", name: "global" }, method: name, arguments: args }
         }
-        return { type: "identifier", name }
+
+        // Parse FP-style function application
+        return this.parseFunctionApplication({ type: "identifier", name })
+    }
+
+    /**
+     * Parse FP-style function application:
+     * - "foo bar baz" -> foo(bar(baz)) (right-associative, curried)
+     * - "foo bar, baz" -> foo(bar, baz) (comma-separated args)
+     */
+    private parseFunctionApplication(func: ASTNode): ASTNode {
+        const args: ASTNode[] = []
+        let hasComma = false
+
+        while (!this.scanner.isAtEnd() && !this.scanner.isStatementEnd()) {
+            const current = this.scanner.current()
+
+            // Stop if we hit an infix operator or structural token
+            if (
+                this.infixParsers[current.value] ||
+                current.value === ";" ||
+                current.value === ")" ||
+                current.value === "]" ||
+                current.value === "}" ||
+                current.value === "{" || // Don't consume block as FP-style argument
+                current.value === "=>" ||
+                current.value === "|"
+            ) {
+                break
+            }
+
+            // Handle comma - marks this as multi-arg call
+            if (current.value === ",") {
+                hasComma = true
+                this.scanner.advance()
+                continue
+            }
+
+            // Check if this could be the start of an expression
+            if (this.prefixParsers[current.type] || this.prefixParsers[current.value]) {
+                // Parse the argument at high precedence to avoid consuming operators
+                args.push(this.parseExpr(this.precedence.getPrecedence("(") + 1))
+            } else {
+                break
+            }
+        }
+
+        // No arguments - return just the identifier/expression
+        if (args.length === 0) {
+            return func
+        }
+
+        // If commas were used, pass all args to the function
+        if (hasComma) {
+            return this.makeCall(func, args)
+        }
+
+        // Build right-associative curried calls: foo bar baz -> foo(bar(baz))
+        let result = args[args.length - 1]
+        for (let i = args.length - 2; i >= 0; i--) {
+            result = this.makeCall(args[i], [result])
+        }
+
+        // Apply to the function
+        return this.makeCall(func, [result])
+    }
+
+    private makeCall(func: ASTNode, args: ASTNode[]): ASTNode {
+        if (func.type === "identifier") {
+            return {
+                type: "methodCall",
+                object: { type: "identifier", name: "global" },
+                method: (func as any).name,
+                arguments: args,
+            }
+        } else if (func.type === "fieldAccess") {
+            return { type: "methodCall", object: (func as any).object, method: (func as any).field, arguments: args }
+        }
+        // For other expression types, wrap in a generic call
+        return { type: "methodCall", object: func, method: "__call__", arguments: args }
     }
 
     private parseGroup(): ASTNode {
@@ -280,15 +361,15 @@ export class Parser {
             return { type: "typeDeclaration", name, isAbstract, parent, typeParams, fields: [], variants }
         }
 
-        // Record Type
+        // Record Type with bracket syntax: type Point [ x: Float, y: Float ]
         const fields: any[] = []
-        if (this.scanner.match(":")) {
-            while (this.scanner.checkType("identifier")) {
-                const fName = this.scanner.advance().value
+        if (this.scanner.check("[")) {
+            const parsedFields = this.parseList("[", "]", ",", () => {
+                const fName = this.scanner.consumeType("identifier").value
                 this.scanner.consume(":")
-                fields.push({ name: fName, fieldType: this.parseType() })
-                if (!this.scanner.match(",")) break
-            }
+                return { name: fName, fieldType: this.parseType() }
+            })
+            fields.push(...parsedFields)
         }
         return { type: "typeDeclaration", name, isAbstract, parent, typeParams, fields }
     }
@@ -387,14 +468,21 @@ export class Parser {
 
     private parseDotAccess(left: ASTNode): ASTNode {
         const field = this.scanner.consumeType("identifier").value
+
+        // Check for parenthesized method call: obj.method(args)
         if (this.scanner.check("(")) {
             const args = this.parseList("(", ")", ",", () => this.parseExpr(0))
             return { type: "methodCall", object: left, method: field, arguments: args }
         }
+
+        // Check for block argument: obj.method { ... }
         if (this.scanner.check("{")) {
             return { type: "methodCall", object: left, method: field, arguments: [this.parseBlock()] }
         }
-        return { type: "fieldAccess", object: left, field }
+
+        // Try FP-style method application: obj.method arg1 arg2
+        const fieldAccess: ASTNode = { type: "fieldAccess", object: left, field }
+        return this.parseFunctionApplication(fieldAccess)
     }
 
     private parseTypeInstance(left: ASTNode): ASTNode {

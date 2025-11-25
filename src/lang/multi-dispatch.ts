@@ -89,7 +89,12 @@ function unify(concrete: BaseType, pattern: BaseType, env: UnificationEnv): bool
         return true
     }
 
-    // C. Standard Subtyping
+    // C. Structural equality check for same-named types
+    if (concrete.name === pattern.name && concrete.kind === pattern.kind) {
+        return true
+    }
+
+    // D. Standard Subtyping
     return isSubtype(concrete, pattern)
 }
 

@@ -21,10 +21,22 @@ export const NullT = new ConcreteType("Null", ANY)
 export const UndefinedT = new ConcreteType("Undefined", ANY)
 
 /**
+ * Cache for array types to ensure we reuse the same instance
+ */
+const ARRAY_TYPE_CACHE = new Map<number, ParametricType>()
+
+/**
  * Create an Array type with specific element type
  */
 export function ArrayT(elementType: BaseType): ParametricType {
-    return new ParametricType("Array", [elementType], ANY)
+    // Use element type's id as cache key
+    const cacheKey = elementType.id
+
+    if (!ARRAY_TYPE_CACHE.has(cacheKey)) {
+        ARRAY_TYPE_CACHE.set(cacheKey, new ParametricType("Array", [elementType], ANY))
+    }
+
+    return ARRAY_TYPE_CACHE.get(cacheKey)!
 }
 
 /**

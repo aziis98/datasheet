@@ -8,24 +8,29 @@ type User :=
 | Anonymous
 
 // Create instances of each variant
-admin := Admin("Alice")
-basic := Basic("Bob", 30)
-anon := Anonymous()
+admin := Admin [ name: "Alice" ]
+basic := Basic [ name: "Bob", age: 30 ]
+anon := Anonymous
 
-// Example 2: Result type for error handling with multiline match
+// Example 2: Result type for error handling
 type Result :=
 | Ok [ value: String ]
 | Err [ message: String ]
 
-// Handler function using brace-delimited match with wildcard
-handler := { result |
-  match result {
-    Ok => "✓ Success: " + result.value
-    Err => "✗ Failed: " + result.message
-  }
+// Create result instances and pattern match
+success := Ok [ value: "operation completed" ]
+result1 := match success {
+  Ok [ value: ?v ] => v
+  Err [ message: ?m ] => m
 }
 
-// Test the handler
-handler(Ok("operation completed"))
+print("Result 1: " + result1)
 
+failure := Err [ message: "something went wrong" ]
+result2 := match failure {
+  Ok [ value: ?v ] => v
+  Err [ message: ?m ] => m
+}
+
+print("Result 2: " + result2)
 

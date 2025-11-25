@@ -1,0 +1,24 @@
+
+abstract type Shape
+
+// Define area function for different shapes
+type Circle <: Shape [
+	radius: Float
+]
+
+type Rectangle <: Shape [ 
+	width: Float
+	height: Float
+]
+
+fn area shape: Circle := 
+	3.14159 * shape.radius * shape.radius
+
+fn area shape: Rectangle := 
+	shape.width * shape.height
+
+c := Circle [ radius: 5.0 ]
+r := Rectangle [ width: 4.0, height: 3.0 ]
+
+print (area c)  // 78.53975
+print (area r)  // 12.0

@@ -271,7 +271,7 @@ describe("Lexer and Parser", () => {
 
     describe("Type Declarations", () => {
         test("parses simple type declaration", () => {
-            const ast = parse("type User: id: Int, name: String")
+            const ast = parse("type User [ id: Int, name: String ]")
             expect(ast[0]).toMatchObject({
                 type: "typeDeclaration",
                 name: "User",
@@ -293,7 +293,7 @@ describe("Lexer and Parser", () => {
         })
 
         test("parses type with inheritance", () => {
-            const ast = parse("type Circle <: Shape: radius: Float")
+            const ast = parse("type Circle <: Shape [ radius: Float ]")
             expect(ast[0]).toMatchObject({
                 type: "typeDeclaration",
                 name: "Circle",
@@ -568,7 +568,7 @@ describe("Lexer and Parser", () => {
 
     describe("Generic Types", () => {
         test("parses generic type annotation", () => {
-            const ast = parse("type Container: value: Option<Int>")
+            const ast = parse("type Container [ value: Option<Int> ]")
             expect(ast[0]).toMatchObject({
                 type: "typeDeclaration",
                 name: "Container",
@@ -585,7 +585,7 @@ describe("Lexer and Parser", () => {
         })
 
         test("parses nested generic types", () => {
-            const ast = parse("type Data: items: Result<List<String>, Error>")
+            const ast = parse("type Data [ items: Result<List<String>, Error> ]")
             expect(ast[0]).toMatchObject({
                 type: "typeDeclaration",
                 name: "Data",

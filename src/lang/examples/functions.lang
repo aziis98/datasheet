@@ -1,4 +1,7 @@
 // Function definition and invocation
-fn square x: Int := x * x
+fn prova x: Int := x * x
 
-square 5
+fn prova x: String := x + " world"
+
+print (prova 5)
+print (prova "hello")

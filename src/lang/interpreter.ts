@@ -16,25 +16,26 @@ import {
     NumberT,
     StringT,
 } from "./builtins"
-import { BaseType } from "./type-system"
+import { GenericFunction } from "./multi-dispatch"
+import { AbstractType, BaseType, ConcreteType, TypeVar } from "./type-system"
 import type { ASTNode, RuntimeValue } from "./types"
 
 /**
  * Environment for storing variable bindings
  */
 export class Environment {
-    private variables: Map<string, RuntimeValue> = new Map()
+    private variables: Map<string, RuntimeValue | GenericFunction> = new Map()
     private parent: Environment | null = null
 
     constructor(parent: Environment | null = null) {
         this.parent = parent
     }
 
-    define(name: string, value: RuntimeValue): void {
+    define(name: string, value: RuntimeValue | GenericFunction): void {
         this.variables.set(name, value)
     }
 
-    get(name: string): RuntimeValue {
+    get(name: string): RuntimeValue | GenericFunction {
         if (this.variables.has(name)) {
             return this.variables.get(name)!
         }
@@ -44,7 +45,7 @@ export class Environment {
         throw new Error(`Undefined variable: ${name}`)
     }
 
-    set(name: string, value: RuntimeValue): void {
+    set(name: string, value: RuntimeValue | GenericFunction): void {
         if (this.variables.has(name)) {
             this.variables.set(name, value)
         } else if (this.parent) {
@@ -134,6 +135,10 @@ export class Interpreter {
         const value = node.value
 
         if (valueType === "number") {
+            // Use IntT for integers, NumberT for floats
+            if (Number.isInteger(value)) {
+                return wrapValue(value, IntT)
+            }
             return wrapValue(value, NumberT)
         } else if (valueType === "string") {
             return wrapValue(value, StringT)
@@ -145,7 +150,11 @@ export class Interpreter {
     }
 
     private evaluateIdentifier(node: any, env: Environment): RuntimeValue {
-        return env.get(node.name)
+        const value = env.get(node.name)
+        if (isGenericFunction(value)) {
+            return wrapValue(value, BUILTIN_TYPES.get("Any")!)
+        }
+        return value
     }
 
     private evaluateBinaryOp(node: any, env: Environment): RuntimeValue {
@@ -225,13 +234,29 @@ export class Interpreter {
             const funcName = node.method
             const func = env.get(funcName)
 
-            if (func.value && typeof func.value.call === "function") {
-                // It's a GenericFunction
-                const argsArray = wrapValue(args, ArrayT(BUILTIN_TYPES.get("Any")!))
+            // Check if it's a GenericFunction directly
+            if (isGenericFunction(func)) {
+                // Determine the array element type from the first argument if all are the same type
+                let elementType = BUILTIN_TYPES.get("Any")!
+                if (args.length > 0 && args.every((arg: RuntimeValue) => arg.__type__ === args[0].__type__)) {
+                    elementType = args[0].__type__
+                }
+                const argsArray = wrapValue(args, ArrayT(elementType))
+                return func.call(argsArray) as RuntimeValue
+            }
+
+            // It's a RuntimeValue wrapping a function
+            if (isRuntimeValue(func) && func.value && typeof func.value.call === "function") {
+                // It's a GenericFunction wrapped in RuntimeValue
+                let elementType = BUILTIN_TYPES.get("Any")!
+                if (args.length > 0 && args.every((arg: RuntimeValue) => arg.__type__ === args[0].__type__)) {
+                    elementType = args[0].__type__
+                }
+                const argsArray = wrapValue(args, ArrayT(elementType))
                 return func.value.call(argsArray) as RuntimeValue
             }
 
-            if (typeof func.value === "function") {
+            if (isRuntimeValue(func) && typeof func.value === "function") {
                 // Regular function - could be ADT constructor or user-defined
                 const result = func.value(args)
 
@@ -425,7 +450,7 @@ export class Interpreter {
         // Check if it's an ADT constructor
         try {
             const constructor = env.get(node.typeName)
-            if (constructor.value && typeof constructor.value === "function") {
+            if (isRuntimeValue(constructor) && constructor.value && typeof constructor.value === "function") {
                 // Extract field values in order
                 const args = node.fields.map((field: any) => this.evaluate(field.value, env))
                 const result = constructor.value(...args)
@@ -442,12 +467,15 @@ export class Interpreter {
             // Not a constructor, fall through
         }
 
-        // Object construction
+        // Object construction - check if there's a registered type
         const obj: Record<string, any> = {}
         for (const field of node.fields) {
             obj[field.key] = this.evaluate(field.value, env)
         }
-        return wrapValue(obj, BUILTIN_TYPES.get("Any")!)
+
+        // Use the registered type if available, otherwise fall back to Any
+        const instanceType = BUILTIN_TYPES.get(node.typeName) || BUILTIN_TYPES.get("Any")!
+        return wrapValue(obj, instanceType)
     }
 
     private evaluateFunctionDeclaration(node: any, env: Environment): RuntimeValue {
@@ -455,31 +483,102 @@ export class Interpreter {
         const params = node.parameters
         const body = node.body
 
-        const func = (fnArgs: any[]) => {
-            const funcEnv = new Environment(env)
+        // Check if function already exists for multi-dispatch
+        let genericFunc: GenericFunction
+        try {
+            const existing = env.get(name)
+            if (isGenericFunction(existing)) {
+                // It's already a GenericFunction
+                genericFunc = existing
+            } else {
+                // Create new GenericFunction
+                genericFunc = new GenericFunction(name)
+            }
+        } catch {
+            // Function doesn't exist yet, create new GenericFunction
+            genericFunc = new GenericFunction(name)
+        }
 
-            for (let i = 0; i < params.length; i++) {
-                const paramName = params[i].name
-                const argValue = fnArgs[i]
+        // For single-parameter functions, match on Array[Type]
+        // For multi-parameter, we'd need tuple types (not implemented yet)
+        if (params.length === 1) {
+            const param = params[0]
+            let arrayElementType: any
+
+            if (param.typeAnnotation) {
+                // Typed parameter: fn foo x: String
+                const typeName = param.typeAnnotation.name
+                arrayElementType = BUILTIN_TYPES.get(typeName) || BUILTIN_TYPES.get("Any")!
+            } else {
+                // Untyped parameter: fn foo x
+                arrayElementType = new TypeVar("T", BUILTIN_TYPES.get("Any")!)
+            }
+
+            const typeVars = param.typeAnnotation ? [] : [arrayElementType]
+
+            genericFunc = genericFunc.withMethod(typeVars, [ArrayT(arrayElementType)], (argsArray: RuntimeValue) => {
+                const funcEnv = new Environment(env)
+                const args = argsArray.value
+
+                const paramName = param.name
+                const argValue = args[0]
 
                 if (isRuntimeValue(argValue)) {
                     funcEnv.define(paramName, argValue)
                 } else {
                     funcEnv.define(paramName, wrapValue(argValue, BUILTIN_TYPES.get("Any")!))
                 }
-            }
 
-            return this.evaluate(body, funcEnv)
+                return this.evaluate(body, funcEnv)
+            })
+        } else {
+            // Multi-parameter functions - use Array[Any] for now
+            // TODO: Implement tuple types for proper multi-dispatch
+            const T = new TypeVar("T", BUILTIN_TYPES.get("Any")!)
+
+            genericFunc = genericFunc.withMethod([T], [ArrayT(T)], (argsArray: RuntimeValue) => {
+                const funcEnv = new Environment(env)
+                const args = argsArray.value
+
+                for (let i = 0; i < params.length; i++) {
+                    const paramName = params[i].name
+                    const argValue = args[i]
+
+                    if (isRuntimeValue(argValue)) {
+                        funcEnv.define(paramName, argValue)
+                    } else {
+                        funcEnv.define(paramName, wrapValue(argValue, BUILTIN_TYPES.get("Any")!))
+                    }
+                }
+
+                return this.evaluate(body, funcEnv)
+            })
         }
 
-        const funcValue = wrapValue(func, BUILTIN_TYPES.get("Any")!)
-        env.define(name, funcValue)
+        env.define(name, genericFunc)
 
-        return funcValue
+        return wrapValue(genericFunc, BUILTIN_TYPES.get("Any")!)
     }
 
     private evaluateTypeDeclaration(node: any, env: Environment): RuntimeValue {
         const typeName = node.name
+        const parentTypeName = node.parent
+        const isAbstract = node.isAbstract
+
+        // Determine the parent type
+        let parentType: BaseType = BUILTIN_TYPES.get("Any")!
+        if (parentTypeName) {
+            parentType = BUILTIN_TYPES.get(parentTypeName) || BUILTIN_TYPES.get("Any")!
+        }
+
+        // Create and register the new type
+        let newType: BaseType
+        if (isAbstract) {
+            newType = new AbstractType(typeName, parentType)
+        } else {
+            newType = new ConcreteType(typeName, parentType)
+        }
+        BUILTIN_TYPES.set(typeName, newType)
 
         // If this is an ADT, register variant constructors
         if (node.variants && node.variants.length > 0) {
@@ -487,13 +586,17 @@ export class Interpreter {
                 const variantName = variant.name
                 const variantFields = variant.fields
 
+                // Create a type for this variant
+                const variantType = new ConcreteType(variantName, newType)
+                BUILTIN_TYPES.set(variantName, variantType)
+
                 // Parameter-less variants are simple values
                 if (variantFields.length === 0) {
                     const instance = {
                         __adt: typeName,
                         __variant: variantName,
                     }
-                    env.define(variantName, wrapValue(instance, BUILTIN_TYPES.get("Any")!))
+                    env.define(variantName, wrapValue(instance, variantType))
                 } else {
                     // Variants with parameters are constructors
                     const variantConstructor = (...args: any[]) => {
@@ -506,15 +609,15 @@ export class Interpreter {
                             const fieldName = variantFields[i].name
                             const argValue = args[i]
 
-                            // Properly unwrap the argument
+                            // Store the RuntimeValue directly to preserve type info
                             if (argValue !== undefined) {
-                                instance[fieldName] = unwrapValue(argValue)
+                                instance[fieldName] = argValue
                             } else {
                                 instance[fieldName] = null
                             }
                         }
 
-                        return wrapValue(instance, BUILTIN_TYPES.get("Any")!)
+                        return wrapValue(instance, variantType)
                     }
 
                     env.define(variantName, wrapValue(variantConstructor, BUILTIN_TYPES.get("Any")!))
@@ -559,4 +662,13 @@ export function unwrapValue(rv: RuntimeValue | any): any {
 
 function isRuntimeValue(val: any): val is RuntimeValue {
     return val !== null && typeof val === "object" && "__type__" in val && "value" in val
+}
+
+function isGenericFunction(val: any): val is GenericFunction {
+    return (
+        val !== null &&
+        typeof val === "object" &&
+        typeof val.call === "function" &&
+        typeof val.withMethod === "function"
+    )
 }
