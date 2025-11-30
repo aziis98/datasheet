@@ -22,6 +22,19 @@ export type ViewerProps<V extends Value> = {
 
 // Helper type for manipulating values
 
+const liftMapping = (fn: (value: string) => string): ((value: Value) => Value) => {
+    return (value: Value): Value => {
+        if (value.type === "text") {
+            return {
+                type: "text",
+                content: fn(value.content),
+            }
+        } else {
+            throw new Error("liftMapping only supports TextValue")
+        }
+    }
+}
+
 export class ValueWrapper<V extends Value> {
     inner: V
 
@@ -99,51 +112,108 @@ export class ValueWrapper<V extends Value> {
         })
     }
 
-    /**
-     * Applies a mapping function to each row of the table, returning a new table.
-     * The mapping function can either be a function that takes a row and returns an object
-     * with new column values, or an object mapping column names to functions that transform
-     * individual cell values.
-     */
+    mapRows(
+        this: ValueWrapper<TableValue>,
+        mapFn: (row: string[]) => Record<string, string>
+    ): ValueWrapper<TableValue> {
+        const newData: Record<string, TextValue>[] = this.inner.data
+            .map(row => mapFn(row.map(cell => (cell.type === "text" ? cell.content : ""))))
+            .map(rowRecord =>
+                Object.fromEntries(
+                    Object.entries(rowRecord).map(([key, textValue]) => [
+                        key,
+                        {
+                            type: "text",
+                            content: textValue.toString(),
+                        },
+                    ])
+                )
+            )
+
+        const newColumns = Object.keys(newData[0] || {})
+
+        for (const obj of newData) {
+            const objKeys = Object.keys(obj)
+            if (objKeys.length !== newColumns.length || !objKeys.every(key => newColumns.includes(key))) {
+                throw new Error("All rows must have the same columns after mapping")
+            }
+        }
+
+        return new ValueWrapper<TableValue>({
+            type: "table",
+            columns: newColumns,
+            data: newData.map(rowRecord => newColumns.map(col => rowRecord[col])),
+        })
+    }
+
+    mapColumns(
+        this: ValueWrapper<TableValue>,
+        mapFn: Record<string, (cell: string) => string>,
+        newColumnNames: Record<string, string> = {}
+    ): ValueWrapper<TableValue> {
+        return new ValueWrapper<TableValue>({
+            type: "table",
+            columns: this.inner.columns.map(col => newColumnNames[col] ?? col),
+            data: this.inner.data.map(row =>
+                row.map((cell, idx) => {
+                    const columnName = this.inner.columns[idx]
+                    return liftMapping(mapFn[columnName])(cell)
+                })
+            ),
+        })
+    }
+
     map(
         this: ValueWrapper<TableValue>,
         mapFn: ((row: string[]) => Record<string, string>) | Record<string, (cell: string) => string>,
         newColumnNames: Record<string, string> = {}
     ): ValueWrapper<TableValue> {
-        // let newData: Value[][]
-
         if (typeof mapFn === "function") {
-            const newData: Record<string, any>[] = this.inner.data.map(row =>
-                mapFn(row.map(cell => (cell.type === "text" ? cell.content : "")))
-            )
-
-            return new ValueWrapper<TableValue>({
-                type: "table",
-                columns: Object.keys(newData[0]),
-                data: newData.map(obj =>
-                    Object.values(obj).map(content => ({
-                        type: "text",
-                        content: content.toString(),
-                    }))
-                ),
-            })
+            return this.mapRows(mapFn)
         } else {
-            return new ValueWrapper<TableValue>({
-                type: "table",
-                columns: this.inner.columns.map(col => newColumnNames[col] ?? col),
-                data: this.inner.data.map(row =>
-                    row.map((cell, idx) => {
-                        const colName = this.inner.columns[idx]
-                        const cellMapper = mapFn[colName]
-                        return cellMapper
-                            ? {
-                                  type: "text",
-                                  content: cellMapper(cell.type === "text" ? cell.content : "").toString(),
-                              }
-                            : cell
-                    })
-                ),
+            return this.mapColumns(mapFn, newColumnNames)
+        }
+    }
+
+    filterRows(this: ValueWrapper<TableValue>, filterFn: (row: string[]) => boolean): ValueWrapper<TableValue> {
+        const newData = this.inner.data.filter(row =>
+            filterFn(row.map(cell => (cell.type === "text" ? cell.content : "")))
+        )
+
+        return new ValueWrapper<TableValue>({
+            type: "table",
+            columns: this.inner.columns,
+            data: newData,
+        })
+    }
+
+    filterColumns(
+        this: ValueWrapper<TableValue>,
+        filterFn: Record<string, (cell: string) => boolean>
+    ): ValueWrapper<TableValue> {
+        const newData = this.inner.data.filter(row =>
+            row.every((cell, idx) => {
+                const colName = this.inner.columns[idx]
+                const cellFilter = filterFn[colName]
+                return cellFilter ? cellFilter(cell.type === "text" ? cell.content : "") : true
             })
+        )
+
+        return new ValueWrapper<TableValue>({
+            type: "table",
+            columns: this.inner.columns,
+            data: newData,
+        })
+    }
+
+    filter(
+        this: ValueWrapper<TableValue>,
+        filterFn: ((row: string[]) => boolean) | Record<string, (cell: string) => boolean>
+    ): ValueWrapper<TableValue> {
+        if (typeof filterFn === "function") {
+            return this.filterRows(filterFn)
+        } else {
+            return this.filterColumns(filterFn)
         }
     }
 }
