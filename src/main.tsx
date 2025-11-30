@@ -344,7 +344,7 @@ const App = () => {
         () =>
             query.trim().length === 0
                 ? null
-                : tryEvaluate(query, {
+                : tryEvaluate(query.trim(), {
                       ...Object.fromEntries(
                           store
                               .prop("entries")
@@ -352,7 +352,7 @@ const App = () => {
                               .map(e => [e.id, new ValueWrapper(e.content)])
                       ),
                   }),
-        [shiftKeyPressed || query]
+        [shiftKeyPressed || query.trim()]
     )
 
     const resultPreviewValue: Value | null =
@@ -530,7 +530,7 @@ const App = () => {
                                         maxHeight="30vh"
                                     />
                                 ) : (
-                                    <code>{JSON.stringify(resultPreview)}</code>
+                                    <code>{JSON.stringify(resultPreview?.value)}</code>
                                 )}
                             </div>
                         </div>
