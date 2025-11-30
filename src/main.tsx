@@ -13,6 +13,7 @@ import "./main.css"
 import { setupPreactClasslist } from "preact-css-extract"
 import { forwardRef } from "preact/compat"
 import { AutosizeInput } from "./components/AutosizeInput"
+import { ContextMenuOverlay, ContextMenuProvider } from "./components/context-menu"
 import { Editable } from "./components/Editable"
 import { EXAMPLE_DATASET } from "./example-dataset"
 import { Optic, useKeyPress, useLocalStorage, useOpticState, useTimer } from "./lib/hooks"
@@ -264,6 +265,7 @@ const EXAMPLE_QUERIES = [
     `customers.map(([id, name]) => { [first_name, last_name] = name.split(" "); return { id, first_name, last_name } })`,
     `orders.join(customers, "customer_id", "id").columns("0.id", "0.date", "0.status", "1.name", "1.email")`,
     `[...Array(100).keys()].filter(n => n > 1 && [...Array(Math.sqrt(n) | 0).keys()].slice(1).every(d => n % (d + 1)))`,
+    `customers.sort("signup_date").columns("name", "city_id").join(cities, "city_id").columns("0.name", "1.name").sort("1.name")`,
 ]
 
 const App = () => {
@@ -357,61 +359,62 @@ const App = () => {
     const PreviewViewer = resultPreviewValue ? Viewers[resultPreviewValue.type] : null
 
     return (
-        <div
-            class={css`
-                display: grid;
-                align-items: start;
-                grid-template-columns: auto 1fr;
-                gap: 0.5rem 1rem;
-
-                /* width: 100%; */
-                /* max-width: 1200px; */
-
-                position: relative;
-
-                > .fill {
-                    grid-column: 1 / -1;
-                }
-            `}
-            style={{
-                width: configExpadnedMode ? "100%" : "auto",
-            }}
-        >
-            <div class="fill flex-h">
-                <h1>DataSheet</h1>
-                <div class="fill"></div>
-
-                {/* Upload Button */}
-                <button title="Upload Data (CSV)" onClick={handleUpload}>
-                    <Icon icon="ph:upload" />
-                    Upload Data
-                </button>
-
-                {/* Toggle Expaned Mode */}
-                <button
-                    class="icon"
-                    onClick={() => {
-                        setConfigExpandedMode(!configExpadnedMode)
-                    }}
-                >
-                    <Icon icon={configExpadnedMode ? "ph:arrows-in" : "ph:arrows-out"} height={18} />
-                </button>
-            </div>
+        <ContextMenuProvider>
             <div
-                classList={[
-                    "fill",
-                    "grid-v",
-                    css`
-                        position: sticky;
-                        top: 0;
+                class={css`
+                    display: grid;
+                    align-items: start;
+                    grid-template-columns: auto 1fr;
+                    gap: 0.5rem 1rem;
 
-                        padding: 1rem 1rem 0.5rem 1rem;
-                        margin: 0 -1rem;
+                    /* width: 100%; */
+                    /* max-width: 1200px; */
 
-                        z-index: 3;
-                        background: var(--bg-main);
+                    position: relative;
 
-                        /* &::after {
+                    > .fill {
+                        grid-column: 1 / -1;
+                    }
+                `}
+                style={{
+                    width: configExpadnedMode ? "100%" : "auto",
+                }}
+            >
+                <div class="fill flex-h">
+                    <h1>DataSheet</h1>
+                    <div class="fill"></div>
+
+                    {/* Upload Button */}
+                    <button title="Upload Data (CSV)" onClick={handleUpload}>
+                        <Icon icon="ph:upload" />
+                        Upload Data
+                    </button>
+
+                    {/* Toggle Expaned Mode */}
+                    <button
+                        class="icon"
+                        onClick={() => {
+                            setConfigExpandedMode(!configExpadnedMode)
+                        }}
+                    >
+                        <Icon icon={configExpadnedMode ? "ph:arrows-in" : "ph:arrows-out"} height={18} />
+                    </button>
+                </div>
+                <div
+                    classList={[
+                        "fill",
+                        "grid-v",
+                        css`
+                            position: sticky;
+                            top: 0;
+
+                            padding: 1rem 1rem 0.5rem 1rem;
+                            margin: 0 -1rem;
+
+                            z-index: 3;
+                            background: var(--bg-main);
+
+                            /* &::after {
                             content: "";
                             position: absolute;
                             left: 0;
@@ -423,156 +426,159 @@ const App = () => {
 
                             transition: opacity 250ms ease-in-out;
                         } */
-                    `,
-                    // bodyAtTop &&
-                    //     css`
-                    //         &::after {
-                    //             opacity: 0;
-                    //             transition: opacity 64ms ease-in-out;
-                    //         }
-                    //     `,
-                ]}
-                ref={(el: HTMLDivElement | null) => {
-                    queryContainerRef.current = el
-                    updateQueryHeight()
-                }}
-            >
-                <QueryBar
-                    classList={[
-                        "card",
-                        css`
-                            overflow: visible;
-
-                            box-sizing: content-box;
-                            padding: 0.5rem;
-
-                            font-family: "JetBrains Mono Variable", monospace;
-                            font-size: 14px;
-                            line-height: 1.5;
-
-                            z-index: 2;
                         `,
+                        // bodyAtTop &&
+                        //     css`
+                        //         &::after {
+                        //             opacity: 0;
+                        //             transition: opacity 64ms ease-in-out;
+                        //         }
+                        //     `,
                     ]}
-                    query={query}
-                    setQuery={value => {
+                    ref={(el: HTMLDivElement | null) => {
+                        queryContainerRef.current = el
                         updateQueryHeight()
-                        setQuery(value)
-                        setQueryTarget(value)
+                    }}
+                >
+                    <QueryBar
+                        classList={[
+                            "card",
+                            css`
+                                overflow: visible;
+
+                                box-sizing: content-box;
+                                padding: 0.5rem;
+
+                                font-family: "JetBrains Mono Variable", monospace;
+                                font-size: 14px;
+                                line-height: 1.5;
+
+                                z-index: 2;
+                            `,
+                        ]}
+                        query={query}
+                        setQuery={value => {
+                            updateQueryHeight()
+                            setQuery(value)
+                            setQueryTarget(value)
+                        }}
+                    />
+
+                    <div
+                        classList={[
+                            css`
+                                display: grid;
+                                grid-template-columns: auto 1fr;
+                                justify-items: start;
+
+                                z-index: 1;
+
+                                margin: 0 0.5rem;
+                                padding: 0.5rem;
+                                gap: 0.5rem;
+
+                                background: hsl(from var(--bg-main) h calc(s + 15) calc(l + 3));
+                                border: 1px solid var(--border);
+                                border-top: none;
+
+                                border-bottom-left-radius: 0.5rem;
+                                border-bottom-right-radius: 0.5rem;
+
+                                box-shadow: var(--shadow);
+
+                                max-height: 100vh;
+                                transition: all 200ms ease-out;
+
+                                > .iconify {
+                                    grid-row: 1 / -1;
+                                }
+                            `,
+                            !(query.trim().length > 0 && resultPreview !== null) &&
+                                css`
+                                    pointer-events: none;
+                                    transform: translateY(-100%);
+                                    opacity: 0;
+                                    max-height: 0;
+                                    padding: 0;
+                                `,
+                        ]}
+                        style={{
+                            top: `calc(3.5rem + 2rem + ${queryHeight}px)`,
+                        }}
+                    >
+                        <Icon icon="ph:arrow-bend-down-right" />
+                        {/* <span>Preliminary result for query:</span> */}
+                        <div
+                            class={css`
+                                grid-column: 2 / 3;
+                            `}
+                        >
+                            <div
+                                classList={[
+                                    "card",
+                                    css`
+                                        zoom: 0.8;
+                                        border-radius: 0.5rem;
+                                    `,
+                                ]}
+                            >
+                                {PreviewViewer && resultPreviewValue ? (
+                                    <PreviewViewer
+                                        suggestQuery={completion => setQuery(queryTarget + completion)}
+                                        oValue={Optic.of<Value>(resultPreviewValue)}
+                                        maxHeight="30vh"
+                                    />
+                                ) : (
+                                    <code>{JSON.stringify(resultPreview)}</code>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <Outline topOffset={queryHeight} entries={store.prop("entries")} />
+                <MainContent
+                    entries={store.prop("entries")}
+                    suggestQuery={completion => {
+                        setQuery(completion)
+                        setQueryTarget(completion)
                     }}
                 />
 
                 <div
-                    classList={[
-                        css`
-                            display: grid;
-                            grid-template-columns: auto 1fr;
-                            justify-items: start;
+                    class={css`
+                        position: fixed;
+                        bottom: 1rem;
+                        left: 1rem;
 
-                            z-index: 1;
-
-                            margin: 0 0.5rem;
-                            padding: 0.5rem;
-                            gap: 0.5rem;
-
-                            background: hsl(from var(--bg-main) h calc(s + 15) calc(l + 3));
-                            border: 1px solid var(--border);
-                            border-top: none;
-
-                            border-bottom-left-radius: 0.5rem;
-                            border-bottom-right-radius: 0.5rem;
-
-                            box-shadow: var(--shadow);
-
-                            max-height: 100vh;
-                            transition: all 200ms ease-out;
-
-                            > .iconify {
-                                grid-row: 1 / -1;
-                            }
-                        `,
-                        !(query.trim().length > 0 && resultPreview !== null) &&
-                            css`
-                                pointer-events: none;
-                                transform: translateY(-100%);
-                                opacity: 0;
-                                max-height: 0;
-                                padding: 0;
-                            `,
-                    ]}
-                    style={{
-                        top: `calc(3.5rem + 2rem + ${queryHeight}px)`,
-                    }}
+                        z-index: 1000;
+                    `}
                 >
-                    <Icon icon="ph:arrow-bend-down-right" />
-                    {/* <span>Preliminary result for query:</span> */}
-                    <div
-                        class={css`
-                            grid-column: 2 / 3;
-                        `}
-                    >
+                    {shiftKeyPressed && (
                         <div
-                            classList={[
-                                "card",
-                                css`
-                                    zoom: 0.8;
-                                    border-radius: 0.5rem;
-                                `,
-                            ]}
+                            class={css`
+                                display: grid;
+                                place-items: center;
+
+                                padding: 0.25rem 0.5rem;
+                                border-radius: 0.5rem;
+                                opacity: 0.75;
+
+                                background: #111;
+                                color: #fff;
+
+                                font-family: "JetBrains Mono Variable", monospace;
+                                font-size: 15px;
+                            `}
                         >
-                            {PreviewViewer && resultPreviewValue ? (
-                                <PreviewViewer
-                                    suggestQuery={completion => setQuery(queryTarget + completion)}
-                                    oValue={Optic.of<Value>(resultPreviewValue)}
-                                    maxHeight="30vh"
-                                />
-                            ) : (
-                                <code>{JSON.stringify(resultPreview)}</code>
-                            )}
+                            Shift
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
-            <Outline topOffset={queryHeight} entries={store.prop("entries")} />
-            <MainContent
-                entries={store.prop("entries")}
-                suggestQuery={completion => {
-                    setQuery(completion)
-                    setQueryTarget(completion)
-                }}
-            />
-
-            <div
-                class={css`
-                    position: fixed;
-                    bottom: 1rem;
-                    left: 1rem;
-
-                    z-index: 1000;
-                `}
-            >
-                {shiftKeyPressed && (
-                    <div
-                        class={css`
-                            display: grid;
-                            place-items: center;
-
-                            padding: 0.25rem 0.5rem;
-                            border-radius: 0.5rem;
-                            opacity: 0.75;
-
-                            background: #111;
-                            color: #fff;
-
-                            font-family: "JetBrains Mono Variable", monospace;
-                            font-size: 15px;
-                        `}
-                    >
-                        Shift
-                    </div>
-                )}
-            </div>
-        </div>
+            <ContextMenuOverlay />
+        </ContextMenuProvider>
     )
 }
 

@@ -1,4 +1,5 @@
 import { AutosizeInput } from "@/components/AutosizeInput"
+import { ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/components/context-menu"
 import { Optic, useClickOutside } from "@/lib/hooks"
 import type { RefObject } from "preact"
 import { css } from "preact-css-extract/comptime"
@@ -157,101 +158,6 @@ const renderCell = (cell: Value): RenderedCell => {
     return { content: `[${cell.type}]` }
 }
 
-export const TableViewer = ({
-    oValue,
-
-    maxHeight,
-    suggestQuery,
-}: ViewerProps<TableValue>) => {
-    const { columns } = oValue.get()
-
-    const oData = oValue.prop("data")
-
-    const [selectedColumns, setSelectedColumns] = useState<string[]>([])
-
-    const containerRef = useRef<HTMLDivElement>(null)
-
-    useClickOutside(containerRef, () => {
-        setSelectedColumns([])
-    })
-
-    // const summaryText = `${rowsOptic.get().length} rows × ${columnNames.length} columns`
-
-    return (
-        <div ref={containerRef} class={scrollAreaClass} style={{ maxHeight }}>
-            <table class={tableClass}>
-                <thead>
-                    <tr>
-                        <th></th>
-                        {columns.map(column => (
-                            <th
-                                key={column}
-                                classList={selectedColumns.includes(column) ? "selected" : ""}
-                                onPointerDown={e => {
-                                    if (e.shiftKey) {
-                                        setSelectedColumns(selectedColumns => {
-                                            const newSelectedColumns = selectedColumns.includes(column)
-                                                ? selectedColumns.filter(col => col !== column)
-                                                : columns.filter(col => selectedColumns.includes(col) || col === column)
-
-                                            suggestQuery?.(
-                                                newSelectedColumns.length === 0
-                                                    ? ""
-                                                    : `.columns(${newSelectedColumns
-                                                          .map(col => `"${col}"`)
-                                                          .join(", ")})`
-                                            )
-
-                                            return newSelectedColumns
-                                        })
-                                    }
-                                }}
-                            >
-                                {column}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {
-                        // arrayRepeat(
-                        oData.items().map((oRow, rowIndex) => (
-                            <tr>
-                                <td data-align="right" data-kind="identifier">
-                                    {rowIndex + 1}
-                                </td>
-                                {oRow.items().map((cell, columnIndex) => {
-                                    const { content, align, kind } = renderCell(cell.get())
-                                    const columnKey = columns[columnIndex] ?? `${columnIndex}`
-
-                                    const textValue = cell.trySubtype(cell => cell.type === "text")
-                                    if (textValue) {
-                                        return <EditableTableTextCell oValue={textValue} />
-                                    }
-
-                                    return (
-                                        <td
-                                            key={columnKey}
-                                            data-align={align}
-                                            data-kind={kind}
-                                            title={typeof content === "string" ? content : undefined}
-                                        >
-                                            {content}
-                                        </td>
-                                    )
-                                })}
-                            </tr>
-                        ))
-                        // ,
-                        //     10
-                        // )
-                    }
-                </tbody>
-            </table>
-        </div>
-    )
-}
-
 const EditableTableTextCell = ({ oValue }: { oValue: Optic<TextValue> }) => {
     const containerRef = useRef<HTMLTableCellElement>(null)
     const { align, kind } = renderCell(oValue.get())
@@ -382,5 +288,122 @@ const EditableTextCell = ({
                     document.getElementById("overlay")!
                 )}
         </>
+    )
+}
+
+const createTableColumnContextMenu =
+    (column: string, suggestQuery?: (completion: string) => void) =>
+    ({}) => {
+        return (
+            <>
+                <div class="title">{column}</div>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                    icon="ph:sort-ascending"
+                    label="Sort Ascending"
+                    onClick={() => suggestQuery?.(`.sort("${column}")`)}
+                />
+                <ContextMenuItem
+                    icon="ph:sort-descending"
+                    label="Sort Descending"
+                    onClick={() => suggestQuery?.(`.sort("${column}", "desc")`)}
+                />
+                <ContextMenuItem label="Filter..." />
+            </>
+        )
+    }
+
+export const TableViewer = ({
+    oValue,
+
+    maxHeight,
+    suggestQuery,
+}: ViewerProps<TableValue>) => {
+    const { columns } = oValue.get()
+
+    const oData = oValue.prop("data")
+
+    const [selectedColumns, setSelectedColumns] = useState<string[]>([])
+
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    useClickOutside(containerRef, () => {
+        setSelectedColumns([])
+    })
+
+    const { showContextMenu } = useContextMenu()
+
+    return (
+        <div ref={containerRef} class={scrollAreaClass} style={{ maxHeight }}>
+            <table class={tableClass}>
+                <thead>
+                    <tr>
+                        <th></th>
+                        {columns.map(column => (
+                            <th
+                                key={column}
+                                title={column}
+                                classList={selectedColumns.includes(column) ? "selected" : ""}
+                                onContextMenu={e => {
+                                    console.log("Showing context menu for column", column)
+                                    e.preventDefault()
+                                    showContextMenu(e, createTableColumnContextMenu(column, suggestQuery))
+                                }}
+                                onPointerDown={e => {
+                                    if (e.buttons === 1 /* Left button */ && e.shiftKey) {
+                                        setSelectedColumns(selectedColumns => {
+                                            const newSelectedColumns = selectedColumns.includes(column)
+                                                ? selectedColumns.filter(col => col !== column)
+                                                : columns.filter(col => selectedColumns.includes(col) || col === column)
+
+                                            suggestQuery?.(
+                                                newSelectedColumns.length === 0
+                                                    ? ""
+                                                    : `.columns(${newSelectedColumns
+                                                          .map(col => `"${col}"`)
+                                                          .join(", ")})`
+                                            )
+
+                                            return newSelectedColumns
+                                        })
+                                    }
+                                }}
+                            >
+                                {column}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {oData.items().map((oRow, rowIndex) => (
+                        <tr>
+                            <td data-align="right" data-kind="identifier">
+                                {rowIndex + 1}
+                            </td>
+                            {oRow.items().map((cell, columnIndex) => {
+                                const { content, align, kind } = renderCell(cell.get())
+                                const columnKey = columns[columnIndex] ?? `${columnIndex}`
+
+                                const textValue = cell.trySubtype(cell => cell.type === "text")
+                                if (textValue) {
+                                    return <EditableTableTextCell oValue={textValue} />
+                                }
+
+                                return (
+                                    <td
+                                        key={columnKey}
+                                        data-align={align}
+                                        data-kind={kind}
+                                        title={typeof content === "string" ? content : undefined}
+                                    >
+                                        {content}
+                                    </td>
+                                )
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     )
 }

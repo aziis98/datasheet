@@ -23,9 +23,11 @@ export const tryEvaluate = (code: string, context: Record<string, any> = {}): an
         const func = new Function(...contextKeys, `return (${code})`)
 
         // Call the function with the context values
+        console.time("tryEvaluate")
         const result = func(...contextValues)
+        console.timeEnd("tryEvaluate")
 
-        console.log("Evaluating", code, "with context:", context, "\n=>", result)
+        // console.log("Evaluating", code, "with context:", context, "\n=>", result)
 
         return result
     } catch (e) {

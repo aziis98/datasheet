@@ -216,4 +216,40 @@ export class ValueWrapper<V extends Value> {
             return this.filterColumns(filterFn)
         }
     }
+
+    sort(this: ValueWrapper<TableValue>, column: string, direction: "asc" | "desc" = "asc"): ValueWrapper<TableValue> {
+        const colIndex = this.inner.columns.indexOf(column)
+        if (colIndex === -1) {
+            throw new Error("Sort column not found")
+        }
+
+        const isNumericColumn = this.inner.data.every(row => {
+            const cell = row[colIndex]
+            if (cell.type === "text") {
+                return !isNaN(parseFloat(cell.content))
+            }
+            return false
+        })
+
+        const compareFn = isNumericColumn
+            ? (a: string, b: string) => parseFloat(a) - parseFloat(b)
+            : (a: string, b: string) => a.localeCompare(b)
+
+        const newData = [...this.inner.data].sort((a, b) => {
+            const aCell = a[colIndex]
+            const bCell = b[colIndex]
+
+            const aValue = aCell.type === "text" ? aCell.content : ""
+            const bValue = bCell.type === "text" ? bCell.content : ""
+
+            const cmp = compareFn(aValue, bValue)
+            return direction === "desc" ? -cmp : cmp
+        })
+
+        return new ValueWrapper<TableValue>({
+            type: "table",
+            columns: this.inner.columns,
+            data: newData,
+        })
+    }
 }
