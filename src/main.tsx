@@ -355,7 +355,8 @@ const App = () => {
         [shiftKeyPressed || query]
     )
 
-    const resultPreviewValue: Value | null = resultPreview instanceof ValueWrapper ? resultPreview.inner : null
+    const resultPreviewValue: Value | null =
+        resultPreview?.value instanceof ValueWrapper ? resultPreview.value.inner : null
     const PreviewViewer = resultPreviewValue ? Viewers[resultPreviewValue.type] : null
 
     return (
@@ -468,7 +469,7 @@ const App = () => {
                         classList={[
                             css`
                                 display: grid;
-                                grid-template-columns: auto 1fr;
+                                grid-template-columns: auto 1fr auto;
                                 justify-items: start;
 
                                 z-index: 1;
@@ -533,6 +534,17 @@ const App = () => {
                                 )}
                             </div>
                         </div>
+                        {resultPreview?.elapsedMs !== undefined && (
+                            <div
+                                class={css`
+                                    align-self: end;
+                                    grid-column: 3 / 4;
+                                    color: var(--text-dimmed);
+                                `}
+                            >
+                                {resultPreview.elapsedMs.toFixed(1)}ms
+                            </div>
+                        )}
                     </div>
                 </div>
 

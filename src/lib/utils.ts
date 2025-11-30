@@ -12,27 +12,35 @@ export const arrayRepeat = <T>(items: T[], count: number): T[] => {
     return result
 }
 
-export const tryEvaluate = (code: string, context: Record<string, any> = {}): any | string => {
-    if (!code.trim()) return undefined
+export type TryEvaluateResponse = {
+    value?: unknown
+    error?: string
+    elapsedMs: number
+}
+
+export const tryEvaluate = (code: string, context: Record<string, any> = {}): TryEvaluateResponse => {
+    const trimmedCode = code.trim()
+    if (!trimmedCode) return { value: undefined, elapsedMs: 0 }
 
     const contextKeys = Object.keys(context ?? {})
     const contextValues = Object.values(context ?? {})
+    const start = performance.now()
 
     try {
         // Create a new function with the context keys as parameters
-        const func = new Function(...contextKeys, `return (${code})`)
+        const func = new Function(...contextKeys, `return (${trimmedCode})`)
 
-        // Call the function with the context values
-        console.time("tryEvaluate")
         const result = func(...contextValues)
-        console.timeEnd("tryEvaluate")
+        const elapsedMs = performance.now() - start
 
-        // console.log("Evaluating", code, "with context:", context, "\n=>", result)
-
-        return result
+        return { value: result, elapsedMs }
     } catch (e) {
-        console.log("Error evaluating code:", code)
-        return `Error: ${(e as Error).message}`
+        const elapsedMs = performance.now() - start
+        console.log("Error evaluating code:", trimmedCode)
+        return {
+            error: `Error: ${(e as Error).message}`,
+            elapsedMs,
+        }
     }
 }
 
