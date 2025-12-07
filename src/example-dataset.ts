@@ -578,4 +578,20 @@ export const EXAMPLE_DATASET: {
             `),
         },
     },
+    {
+        id: "example_object",
+        content: {
+            type: "object",
+            data: {
+                name: "Example Object",
+                description: "This is a sample object value for testing.",
+                attributes: {
+                    color: "blue",
+                    size: "medium",
+                    inStock: true,
+                },
+                tags: ["sample", "test", "object"],
+            },
+        },
+    },
 ]

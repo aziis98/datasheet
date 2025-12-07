@@ -11,7 +11,12 @@ export type TableValue = {
     columns: string[]
 }
 
-export type Value = TextValue | TableValue
+export type ObjectValue = {
+    type: "object"
+    data: any
+}
+
+export type Value = TextValue | TableValue | ObjectValue
 
 export type ViewerProps<V extends Value> = {
     oValue: Optic<V>
@@ -40,6 +45,26 @@ export class ValueWrapper<V extends Value> {
 
     constructor(value: V) {
         this.inner = value
+
+        return new Proxy(this, {
+            get: (target, prop, receiver) => {
+                return this.#interceptGet(target, prop, receiver)
+            },
+        })
+    }
+
+    #interceptGet(target: ValueWrapper<V>, prop: string | symbol, receiver: any) {
+        if (this.inner.type === "object" && typeof this.inner.data === "object" && this.inner.data !== null) {
+            if (typeof prop === "string" && prop in this.inner.data) {
+                const propValue = this.inner.data[prop]
+                return new ValueWrapper<any>({
+                    type: "object",
+                    data: propValue,
+                })
+            }
+        }
+
+        return Reflect.get(target, prop, receiver)
     }
 
     get type(): V["type"] {

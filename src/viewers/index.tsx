@@ -8,6 +8,7 @@ console.log("Loaded viewer modules:", Object.keys(viewerModules))
 export const ViewerIcons: Record<Value["type"], string> = {
     text: "ph:text-t",
     table: "ph:database",
+    object: "ph:cube",
 }
 
 export const Viewers = Object.fromEntries(
@@ -54,6 +55,11 @@ export const exportValue = (
             return {
                 mimeType: "text/csv",
                 data: csvContent,
+            }
+        case "object":
+            return {
+                mimeType: "application/json",
+                data: JSON.stringify(value.data, null, 2),
             }
     }
 }

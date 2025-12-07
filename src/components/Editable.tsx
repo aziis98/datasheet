@@ -89,6 +89,8 @@ export const Editable = ({ oValue, inputClass }: { oValue: Optic<string>; inputC
         <span
             ref={spanRef}
             onClick={() => {
+                if (oValue.isReadonly) return
+
                 setEditing(oValue.get())
                 setSpanHeight(spanRef.current?.offsetHeight || null)
             }}
@@ -96,7 +98,7 @@ export const Editable = ({ oValue, inputClass }: { oValue: Optic<string>; inputC
                 cursor: text;
             `}
         >
-            {oValue.get()}
+            {String(oValue.get())}
         </span>
     )
 }

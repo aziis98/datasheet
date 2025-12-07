@@ -11,20 +11,35 @@ export const ContextMenuCtx = createContext<{
     RootComponent?: ComponentType
     setRootComponent?: (component: ComponentType | undefined) => void
 
+    props?: any
+    setProps?: (props: any) => void
+
     closeMenu?: () => void
 }>({})
 
 export const ContextMenuProvider = ({ children }: { children: ComponentChildren }) => {
     const [position, setPosition] = useState<{ x: number; y: number } | undefined>(undefined)
     const [RootComponent, setRootComponent] = useState<ComponentType | undefined>(undefined)
+    const [props, setProps] = useState<any>(undefined)
 
     const closeMenu = () => {
         setRootComponent(undefined)
         setPosition(undefined)
+        setProps(undefined)
     }
 
     return (
-        <ContextMenuCtx.Provider value={{ position, setPosition, RootComponent, setRootComponent, closeMenu }}>
+        <ContextMenuCtx.Provider
+            value={{
+                position,
+                setPosition,
+                RootComponent,
+                setRootComponent,
+                props,
+                setProps,
+                closeMenu,
+            }}
+        >
             {children}
         </ContextMenuCtx.Provider>
     )
@@ -33,7 +48,7 @@ export const ContextMenuProvider = ({ children }: { children: ComponentChildren 
 export const ContextMenuOverlay = ({}) => {
     const containerRef = useRef<HTMLDivElement>(null)
 
-    const { position, RootComponent, closeMenu } = useContext(ContextMenuCtx)
+    const { position, RootComponent, props, closeMenu } = useContext(ContextMenuCtx)
     if (!RootComponent) {
         return null
     }
@@ -53,19 +68,20 @@ export const ContextMenuOverlay = ({}) => {
             }}
         >
             <ContextMenuContainer>
-                <RootComponent />
+                <RootComponent {...props} />
             </ContextMenuContainer>
         </div>
     )
 }
 
 export const useContextMenu = () => {
-    const { setPosition, setRootComponent, closeMenu } = useContext(ContextMenuCtx)
+    const { setPosition, setRootComponent, setProps, closeMenu } = useContext(ContextMenuCtx)
 
-    const showContextMenu = (e: MouseEvent, component: ComponentType) => {
+    const showContextMenu = <P,>(e: MouseEvent, component: ComponentType<P>, props: P) => {
         e.preventDefault()
         setPosition?.({ x: e.clientX, y: e.clientY })
         setRootComponent?.(() => component)
+        setProps?.(props)
     }
 
     return {
