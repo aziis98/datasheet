@@ -76,9 +76,16 @@ const tableClass = css`
             border-bottom: none;
         }
 
-        tr:hover,
-        td:hover {
+        tr:hover {
             background: var(--bg-hover);
+        }
+
+        td:hover {
+            background: var(--bg-hover-dark);
+        }
+
+        tr:has(td:first-child:hover) td {
+            background: var(--bg-hover-dark);
         }
     }
 
@@ -217,6 +224,11 @@ const EditableTableTextCell = ({ oValue }: { oValue: Optic<TextValue> }) => {
             ref={containerRef}
             data-align={align}
             data-kind={kind}
+            classList={[
+                css`
+                    cursor: text;
+                `,
+            ]}
             onClick={() => {
                 console.log(oValue)
                 if (oValue.isReadonly) return
@@ -235,9 +247,6 @@ const EditableTableTextCell = ({ oValue }: { oValue: Optic<TextValue> }) => {
         >
             <span
                 classList={[
-                    css`
-                        cursor: text;
-                    `,
                     editing !== false &&
                         css`
                             opacity: 0.5;

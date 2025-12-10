@@ -11,7 +11,8 @@
     --bg: light-dark(hsl(210, 20%, 98%), #333);
     --bg-header: light-dark(hsl(220, 14%, 96%), #444);
     --bg-label: light-dark(hsl(220, 14%, 92%), #333);
-    --bg-hover: light-dark(hsl(220 14% 50% / 0.05), #393939);
+    --bg-hover: light-dark(hsl(220 14% 95%), #393939);
+    --bg-hover-dark: light-dark(hsl(210, 95%, 93%), #484848);
 
     --bg-button: light-dark(hsl(220 14% 90%), #333);
     --button-fg: hsl(from var(--bg-button) h s calc(100 - l));
