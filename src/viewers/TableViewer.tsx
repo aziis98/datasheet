@@ -1,7 +1,6 @@
 import { AutosizeInput } from "@/components/AutosizeInput"
 import { ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/components/context-menu"
 import { Optic, useClickOutside } from "@/lib/hooks"
-import type { RefObject } from "preact"
 import { css } from "preact-css-extract/comptime"
 import { createPortal } from "preact/compat"
 import { useRef, useState } from "preact/hooks"
@@ -114,6 +113,61 @@ const tableClass = css`
     }
 `
 
+function createRowHandlers(
+    oData: Optic<Value[][]>,
+    columns: string[],
+    rowIndex: number
+): {
+    addRow?: (() => void) | undefined
+    duplicateRow?: (() => void) | undefined
+    moveRow?: ((direction: "up" | "down") => void) | undefined
+    deleteRow?: (() => void) | undefined
+} {
+    return !oData.isReadonly
+        ? {
+              addRow: () => {
+                  oData.update(rows => {
+                      const newRows = [...rows]
+                      const emptyRow: Value[] = columns.map(() => ({
+                          type: "text",
+                          content: "",
+                      }))
+                      newRows.splice(rowIndex + 1, 0, emptyRow)
+                      return newRows
+                  })
+              },
+              duplicateRow: () => {
+                  oData.update(rows => {
+                      const newRows = [...rows]
+                      const rowToDuplicate = rows[rowIndex]
+                      newRows.splice(rowIndex + 1, 0, rowToDuplicate)
+                      return newRows
+                  })
+              },
+              moveRow: direction => {
+                  oData.update(rows => {
+                      if (rowIndex <= 0) return rows
+                      const newRows = [...rows]
+                      const targetIndex = direction === "up" ? rowIndex - 1 : rowIndex + 1
+                      if (targetIndex < 0 || targetIndex >= newRows.length) return rows
+
+                      const temp = newRows[rowIndex]
+                      newRows[rowIndex] = newRows[targetIndex]
+                      newRows[targetIndex] = temp
+
+                      return newRows
+                  })
+              },
+              deleteRow: () => {
+                  oData.update(rows => {
+                      const newRows = rows.filter((_, index) => index !== rowIndex)
+                      return newRows
+                  })
+              },
+          }
+        : {}
+}
+
 const renderCell = (cell: Value): RenderedCell => {
     if (cell.type === "text") {
         const trimmed = cell.content.trim()
@@ -134,32 +188,19 @@ const renderCell = (cell: Value): RenderedCell => {
 
 const EditableTableTextCell = ({ oValue }: { oValue: Optic<TextValue> }) => {
     const containerRef = useRef<HTMLTableCellElement>(null)
-    const { align, kind } = renderCell(oValue.get())
-
-    return (
-        <td ref={containerRef} data-align={align} data-kind={kind}>
-            <EditableTextCell containerRef={containerRef} oValue={oValue.prop("content")} />
-        </td>
-    )
-}
-
-const EditableTextCell = ({
-    containerRef,
-    oValue,
-}: {
-    containerRef: RefObject<HTMLElement>
-    oValue: Optic<string>
-}) => {
-    const editingRef = useRef<HTMLDivElement>(null)
-
     const [containerRect, setContainerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(
         null
     )
 
+    const { align, kind } = renderCell(oValue.get())
+    const oContent = oValue.prop("content")
+
+    const editingRef = useRef<HTMLDivElement>(null)
+
     const [editing, setEditing] = useState<false | string>(false)
 
     const handleAccept = () => {
-        oValue.set(editing as string)
+        oContent.set(editing as string)
         setEditing(false)
     }
 
@@ -172,23 +213,27 @@ const EditableTextCell = ({
     })
 
     return (
-        <>
-            <span
-                onClick={() => {
-                    console.log(oValue)
-                    if (oValue.isReadonly) return
+        <td
+            ref={containerRef}
+            data-align={align}
+            data-kind={kind}
+            onClick={() => {
+                console.log(oValue)
+                if (oValue.isReadonly) return
 
-                    const rect = containerRef.current?.getBoundingClientRect()
-                    if (rect) {
-                        setContainerRect({
-                            x: rect.left,
-                            y: rect.top,
-                            width: rect.width,
-                            height: rect.height,
-                        })
-                    }
-                    setEditing(oValue.get())
-                }}
+                const rect = containerRef.current?.getBoundingClientRect()
+                if (rect) {
+                    setContainerRect({
+                        x: rect.left,
+                        y: rect.top,
+                        width: rect.width,
+                        height: rect.height,
+                    })
+                }
+                setEditing(oContent.get())
+            }}
+        >
+            <span
                 classList={[
                     css`
                         cursor: text;
@@ -206,7 +251,7 @@ const EditableTextCell = ({
                         `,
                 ]}
             >
-                {oValue.get()}
+                {oContent.get()}
             </span>
 
             {editing !== false &&
@@ -261,11 +306,11 @@ const EditableTextCell = ({
                     </div>,
                     document.getElementById("overlay")!
                 )}
-        </>
+        </td>
     )
 }
 
-const TableColumnContextMenu = ({
+const ContextMenuTableColumn = ({
     column,
     suggestQuery,
 }: {
@@ -287,6 +332,56 @@ const TableColumnContextMenu = ({
                 onClick={() => suggestQuery?.(`.sort("${column}", "desc")`)}
             />
             <ContextMenuItem label="Filter..." />
+        </>
+    )
+}
+
+const ContextMenuTableRow = ({
+    tableName,
+    rowIndex,
+
+    addRow,
+    duplicateRow,
+    moveRow,
+    deleteRow,
+
+    suggestQuery,
+}: {
+    tableName: string
+    rowIndex: number
+
+    addRow?: () => void
+    duplicateRow?: () => void
+    moveRow?: (direction: "up" | "down") => void
+    deleteRow?: () => void
+
+    suggestQuery?: (completion: string) => void
+}) => {
+    return (
+        <>
+            <div class="title">
+                {tableName} &rsaquo; Row {rowIndex + 1}
+            </div>
+
+            {(addRow || duplicateRow || deleteRow) && <ContextMenuSeparator />}
+            {addRow && <ContextMenuItem icon="ph:plus" label="Add Row" onClick={() => addRow?.()} />}
+            {duplicateRow && <ContextMenuItem icon="ph:copy" label="Copy Row" onClick={() => duplicateRow?.()} />}
+            {deleteRow && <ContextMenuItem icon="ph:trash" label="Delete Row" onClick={() => deleteRow?.()} />}
+
+            {moveRow && (
+                <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem icon="ph:arrow-up" label="Move Up" onClick={() => moveRow?.("up")} />
+                    <ContextMenuItem icon="ph:arrow-down" label="Move Down" onClick={() => moveRow?.("down")} />
+                </>
+            )}
+
+            <ContextMenuSeparator />
+            <ContextMenuItem
+                icon="ph:selection"
+                label="Select Row"
+                onClick={() => suggestQuery?.(`.row(${rowIndex})`)}
+            />
         </>
     )
 }
@@ -317,9 +412,8 @@ const TableContent = ({
                             title={column}
                             classList={selectedColumns.includes(column) ? "selected" : ""}
                             onContextMenu={e => {
-                                console.log("Showing context menu for column", column)
                                 e.preventDefault()
-                                showContextMenu(e, TableColumnContextMenu, { column, suggestQuery })
+                                showContextMenu(e, ContextMenuTableColumn, { column, suggestQuery })
                             }}
                             onPointerDown={e => {
                                 if (e.buttons === 1 /* Left button */ && e.shiftKey) {
@@ -346,7 +440,18 @@ const TableContent = ({
             </thead>
             <tbody>
                 {oData.items().map((oRow, rowIndex) => (
-                    <tr>
+                    <tr
+                        onContextMenu={e => {
+                            e.preventDefault()
+                            showContextMenu(e, ContextMenuTableRow, {
+                                tableName: "Table",
+                                rowIndex,
+                                suggestQuery,
+
+                                ...createRowHandlers(oData, columns, rowIndex),
+                            })
+                        }}
+                    >
                         <td data-align="right" data-kind="identifier">
                             {rowIndex + 1}
                         </td>

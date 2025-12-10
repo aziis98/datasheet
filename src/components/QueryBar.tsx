@@ -7,8 +7,10 @@ export const QueryBar = forwardRef<
     {
         query: string
         setQuery: (val: string) => void
+
+        onSend?: (source: string) => void
     } & ComponentProps<"textarea">
->(({ query, setQuery, ...rest }, ref) => {
+>(({ query, setQuery, onSend, ...rest }, ref) => {
     return (
         <AutosizeInput
             {...rest}
@@ -21,6 +23,12 @@ export const QueryBar = forwardRef<
             autocomplete="off"
             autocorrect="off"
             autocapitalize="off"
+            onKeyDown={e => {
+                if (e.key === "Enter" && (e.shiftKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    onSend?.(query)
+                }
+            }}
         />
     )
 })

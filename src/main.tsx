@@ -20,7 +20,7 @@ import { Outline } from "@/components/Outline"
 import { QueryBar } from "@/components/QueryBar"
 import { QueryResult } from "@/components/QueryResult"
 import { EXAMPLE_DATASET } from "@/example-dataset"
-import { useKeyPress, useLocalStorage, useOpticState, useTimer } from "@/lib/hooks"
+import { Optic, useKeyPress, useLocalStorage, useOpticState, useTimer } from "@/lib/hooks"
 import { tryEvaluate } from "@/lib/utils"
 import { Viewers } from "@/viewers"
 
@@ -35,6 +35,23 @@ const EXAMPLE_QUERIES = [
     `[...Array(100).keys()].filter(n => n > 1 && [...Array(Math.sqrt(n) | 0).keys()].slice(1).every(d => n % (d + 1)))`,
     `customers.sort("signup_date").columns("name", "city_id").join(cities, "city_id").columns("0.name", "1.name").sort("1.name")`,
 ]
+
+function evaluateQueryWithStore(query: string, store: Optic<{ entries: Entry[] }>): Value | null {
+    const result = tryEvaluate(query.trim(), {
+        ...Object.fromEntries(
+            store
+                .prop("entries")
+                .get()
+                .map(e => [e.id, new ValueWrapper(e.content)])
+        ),
+    })
+
+    if (result?.value instanceof ValueWrapper) {
+        return result.value.inner
+    }
+
+    return null
+}
 
 const App = () => {
     // const [bodyAtTop, setBodyAtTop] = useState(true)
@@ -69,6 +86,13 @@ const App = () => {
     const store = useOpticState<{ entries: Entry[] }>({
         entries: EXAMPLE_DATASET,
     })
+
+    const handleCreateQueryEntry = (expression: string) => {
+        store.prop("entries").arrayAppend({
+            id: `query_${Date.now()}`,
+            content: { type: "computed", expression },
+        })
+    }
 
     const handleUpload = () => {
         const input = document.createElement("input")
@@ -207,9 +231,16 @@ const App = () => {
                         ]}
                         query={query}
                         setQuery={value => {
-                            updateQueryHeight()
                             setQuery(value)
                             setQueryTarget(value)
+                            updateQueryHeight()
+                        }}
+                        onSend={source => {
+                            setQuery("")
+                            setQueryTarget("")
+                            updateQueryHeight()
+
+                            handleCreateQueryEntry(source)
                         }}
                     />
 
@@ -225,7 +256,19 @@ const App = () => {
 
                 <Outline topOffset={queryHeight} entries={store.prop("entries")} />
                 <MainContent
-                    entries={store.prop("entries")}
+                    entries={store.prop("entries").mapSame(entries =>
+                        entries.map(e =>
+                            e.content.type === "computed"
+                                ? {
+                                      ...e,
+                                      content: {
+                                          ...e.content,
+                                          lastResult: evaluateQueryWithStore(e.content.expression, store) ?? undefined,
+                                      },
+                                  }
+                                : e
+                        )
+                    )}
                     suggestQuery={completion => {
                         setQuery(completion)
                         setQueryTarget(completion)

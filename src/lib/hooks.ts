@@ -41,6 +41,10 @@ export class Optic<T> {
         this.update(() => value)
     }
 
+    mapSame(mapTo: (value: T) => T): Optic<T> {
+        return Optic.of<T>(mapTo(this.#value), this.#updater)
+    }
+
     map<U>(mapTo: (value: T) => U, mapBack: (value: U) => T): Optic<U> {
         return Optic.of<U>(
             mapTo(this.#value),

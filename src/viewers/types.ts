@@ -16,7 +16,13 @@ export type ObjectValue = {
     data: any
 }
 
-export type Value = TextValue | TableValue | ObjectValue
+export type ComputedValue = {
+    type: "computed"
+    expression: string
+    lastResult?: Value
+}
+
+export type Value = TextValue | TableValue | ObjectValue | ComputedValue
 
 export type ViewerProps<V extends Value> = {
     oValue: Optic<V>
@@ -44,6 +50,8 @@ export class ValueWrapper<V extends Value> {
     inner: V
 
     constructor(value: V) {
+        // @ts-ignore
+        // this.inner = value.type === "computed" && value.lastResult ? value.lastResult : value
         this.inner = value
 
         return new Proxy(this, {
@@ -79,6 +87,33 @@ export class ValueWrapper<V extends Value> {
         const newValue: TableValue = {
             type: "table",
             columns: columnNames,
+            data: newData,
+        }
+
+        return new ValueWrapper<TableValue>(newValue)
+    }
+
+    row(this: ValueWrapper<TableValue>, spec: number | number[]): ValueWrapper<TableValue> {
+        let newData: Value[][] = []
+        if (typeof spec === "number") {
+            if (spec < 0 || spec >= this.inner.data.length) {
+                throw new Error("Row index out of bounds")
+            }
+            newData = [this.inner.data[spec]]
+        } else if (Array.isArray(spec)) {
+            newData = spec.map(idx => {
+                if (idx < 0 || idx >= this.inner.data.length) {
+                    throw new Error("Row index out of bounds")
+                }
+                return this.inner.data[idx]
+            })
+        } else {
+            throw new Error("Invalid row specifier")
+        }
+
+        const newValue: TableValue = {
+            type: "table",
+            columns: this.inner.columns,
             data: newData,
         }
 

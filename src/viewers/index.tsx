@@ -9,6 +9,7 @@ export const ViewerIcons: Record<Value["type"], string> = {
     text: "ph:text-t",
     table: "ph:database",
     object: "ph:cube",
+    computed: "ph:brackets-curly",
 }
 
 export const Viewers = Object.fromEntries(
@@ -60,6 +61,11 @@ export const exportValue = (
             return {
                 mimeType: "application/json",
                 data: JSON.stringify(value.data, null, 2),
+            }
+        case "computed":
+            return {
+                mimeType: "application/javascript",
+                data: `// Computed Value\n${value.expression}`,
             }
     }
 }

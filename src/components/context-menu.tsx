@@ -102,7 +102,7 @@ const ContextMenuContainer = ({ children }: { children: ComponentChildren }) => 
 
                     > .title {
                         /* min-height: 1.5rem; */
-                        padding: 0.125rem 0.25rem;
+                        padding: 0.125rem 0.5rem;
                         font-weight: 600;
                         font-size: 14px;
 
@@ -166,7 +166,7 @@ export const ContextMenuItem = ({
                 classList={[
                     "grid-h",
                     css`
-                        padding: 0 0.25rem;
+                        padding: 0 0.5rem;
                         font-size: 14px;
 
                         &:hover {
