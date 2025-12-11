@@ -59,8 +59,8 @@ export const ContextMenuOverlay = ({}) => {
         <div
             ref={containerRef}
             class={css`
-                position: fixed;
-                z-index: 2000;
+                position: absolute;
+                z-index: 2;
             `}
             style={{
                 top: position?.y + "px",
@@ -79,7 +79,7 @@ export const useContextMenu = () => {
 
     const showContextMenu = <P,>(e: MouseEvent, component: ComponentType<P>, props: P) => {
         e.preventDefault()
-        setPosition?.({ x: e.clientX, y: e.clientY })
+        setPosition?.({ x: e.pageX, y: e.pageY })
         setRootComponent?.(() => component)
         setProps?.(props)
     }
